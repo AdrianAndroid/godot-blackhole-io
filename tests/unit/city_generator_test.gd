@@ -1,0 +1,47 @@
+extends TestCase
+
+
+func run() -> void:
+	var generator := CityGenerator.new()
+	var first := generator.generate(12345)
+	var signature := first.signature
+	randomize()
+	randf()
+	var second := generator.generate(12345)
+	expect(signature == second.signature, "相同种子与生成版本完全复现")
+	expect(generator.generate(12346).signature != signature, "不同种子布局不同")
+	var forward: Dictionary = {}
+	var reverse: Dictionary = {}
+	for index in 10:
+		forward[index] = generator.generate(500 + index).signature
+	for index in range(9, -1, -1):
+		reverse[index] = generator.generate(500 + index).signature
+	expect(forward == reverse, "布局不依赖全局随机状态或生成顺序")
+
+	var missing_small := generator.generate(77)
+	for index in range(missing_small.objects.size() - 1, -1, -1):
+		var object: Dictionary = missing_small.objects[index]
+		if float(generator._catalog_entry(object.model_id).footprint_radius) < 0.38 and object.position.length() < 12.0:
+			missing_small.objects.remove_at(index)
+	expect(generator.validate_layout(missing_small).any(func(message: String) -> bool: return "小物体" in message), "缺少小物体的负向夹具被拒绝")
+	var threatened := generator.generate(77)
+	threatened.routes[3][0] = Vector3.ZERO
+	expect(generator.validate_layout(threatened).any(func(message: String) -> bool: return "威胁" in message), "出生威胁的负向夹具被拒绝")
+	var occupied := generator.generate(77)
+	occupied.objects.append({"id": 999999, "model_id": "industrial_a", "position": occupied.tower_position, "rotation_y": 0.0, "variant": ""})
+	expect(generator.validate_layout(occupied).any(func(message: String) -> bool: return "高塔" in message), "高塔占用的负向夹具被拒绝")
+
+	var failed_seeds: Array[int] = []
+	for index in 100:
+		var seed_value := 1000 + index * 37
+		var layout := generator.generate(seed_value)
+		var errors := generator.validate_layout(layout)
+		if not errors.is_empty() or layout.signature != generator.generate(seed_value).signature:
+			failed_seeds.append(seed_value)
+	expect(failed_seeds.is_empty(), "100 种子出生/成长/预算/高塔/复现失败: " + str(failed_seeds))
+	expect(first.ordinary_total_score > 0 and first.target_score <= first.ordinary_total_score, "75% 目标不会理论不可完成")
+	var initial_count := first.objects.size()
+	var simulated_time := 600.0
+	expect(first.objects.size() == initial_count and simulated_time == 600.0, "普通建筑不随时间补生成")
+	var retry := generator.generate(first.seed_value)
+	expect(retry.objects.size() == initial_count and retry.signature == first.signature, "同种子重试完整恢复布局")

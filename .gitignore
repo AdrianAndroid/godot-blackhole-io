@@ -1,0 +1,14 @@
+# Godot generated cache
+.godot/
+
+# macOS
+.DS_Store
+
+# Automated verification output
+artifacts/
+
+# Untrusted candidate archives remain available locally without duplicating extraction in Git
+assets/candidates/*/extracted/
+
+# Reference video is a local design input, not a runtime dependency
+/微信视频2026-11-15_205546_945.mp4

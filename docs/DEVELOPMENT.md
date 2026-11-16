@@ -147,6 +147,16 @@ python3 -I tools/subset_font.py --check
 | `play.pck` | 14,585,320 字节 | 1,441,568 字节 |
 | WASM + PCK + JavaScript | 54,379,889 字节 | 41,236,137 字节 |
 
+2026-11-16 在同一台 Mac、同一 Chrome 测试脚本和各自全新浏览器上下文中的公网冷启动样本：
+
+| 指标 | 优化前 | 优化后 |
+| --- | ---: | ---: |
+| 导航到 loading 消失 | 72.615 秒 | 39.183 秒 |
+| WASM + PCK + JavaScript 实际传输 | 24,805,018 字节 | 11,667,284 字节 |
+| PCK Resource Timing 耗时 | 65.598 秒 | 3.251 秒 |
+
+独立 `play.html` 优化后冷启动样本为 45.818 秒，两种入口均通过实际开始、移动、投影和暂停检查。网络秒数只代表上述样本，不是设备性能承诺；核心传输量减少 53.0% 是更稳定的结构性指标。
+
 `tools/web_smoke.py` 的 `startup_seconds` 记录外部导航到 Godot `#status` 消失，`engine_ready_ms` 记录游戏页面自身的 `performance.now()`；`resources` 保存 Resource Timing 的传输量、解码体积、耗时与发起类型。`elapsed_seconds` 还包含固定等待、点击和移动，不能当作纯启动时间。公网优化前后使用同一脚本和新的浏览器上下文测量，报告分别保存在 `artifacts/web/startup-before/` 与最终复验目录。
 
 ### 本地导出与浏览器验证

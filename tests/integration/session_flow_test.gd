@@ -63,7 +63,7 @@ func run() -> void:
 	var hud_session := _session(9004)
 	hud_session._update_hud()
 	expect(hud_session.hud.score_label.text == "目标 0/%d" % hud_session.objective.target_score, "HUD 目标与逻辑快照一致")
-	expect(hud_session.hud.coins_label.text == "金币 0" and hud_session.hud.level_label.text == "体型 1", "HUD 金币体型一致")
+	expect(hud_session.hud.coins_label.text == "金币 0" and hud_session.hud.level_label.text == "大小 1", "HUD 金币体型一致")
 	var all_text := _all_text(hud_session.hud.root_control)
 	expect(not all_text.contains("商店") and not all_text.contains("广告"), "没有商店或广告占位入口")
 	hud_session.free()

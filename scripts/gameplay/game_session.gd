@@ -301,7 +301,7 @@ func _finish(victory: bool, reason: String) -> void:
 func _update_hud() -> void:
 	if hud == null:
 		return
-	hud.update_values({"score": objective.current_score, "target": objective.target_score, "remaining": remaining_time, "level": growth.level, "coins": objective.coins, "completion": objective.completion(), "knockdowns": objective.knockdowns})
+	hud.update_values({"score": objective.current_score, "target": objective.target_score, "remaining": remaining_time, "level": growth.level, "experience": growth.experience, "coins": objective.coins, "completion": objective.completion(), "knockdowns": objective.knockdowns})
 	if tower != null and tower.state != Swallowable.State.SETTLED:
 		var offset := tower.position - player.position
 		var horizontal := "东" if offset.x >= 0 else "西"

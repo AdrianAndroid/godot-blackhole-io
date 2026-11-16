@@ -7,9 +7,13 @@ var joystick_position := Vector2.ZERO
 var joystick_visible: bool = false
 var active_touch_id: int = -1
 var mouse_active: bool = false
-var enabled: bool = true
+var enabled: bool = true:
+	set(value):
+		enabled = value
+		queue_redraw()
 var max_distance: float = 64.0
 var deadzone: float = 5.0
+var idle_center := Vector2(76, 850)
 
 
 func _ready() -> void:
@@ -76,9 +80,18 @@ func clear() -> void:
 
 
 func _draw() -> void:
-	if not joystick_visible:
+	if not enabled:
 		return
-	draw_circle(joystick_origin, 48.0, Color(0.04, 0.07, 0.12, 0.34))
-	draw_arc(joystick_origin, 48.0, 0, TAU, 64, Color(1, 1, 1, 0.6), 2.0, true)
+	if not joystick_visible:
+		draw_circle(idle_center, 47.0, Color(0.12, 0.16, 0.34, 0.18))
+		draw_arc(idle_center, 47.0, 0, TAU, 64, Color(0.92, 0.95, 1.0, 0.34), 2.0, true)
+		draw_circle(idle_center, 21.0, Color(0.96, 0.98, 1.0, 0.36))
+		draw_arc(idle_center, 21.0, 0, TAU, 48, Color(1, 1, 1, 0.50), 2.0, true)
+		return
+	draw_circle(joystick_origin, 50.0, Color(0.10, 0.12, 0.30, 0.32))
+	draw_arc(joystick_origin, 50.0, 0, TAU, 64, Color(0.90, 0.94, 1.0, 0.78), 3.0, true)
+	draw_arc(joystick_origin, 43.0, 0, TAU, 64, Color(0.61, 0.70, 1.0, 0.32), 2.0, true)
 	var knob := joystick_origin + (joystick_position - joystick_origin).limit_length(40.0)
-	draw_circle(knob, 20.0, Color(0.95, 0.98, 1, 0.88))
+	draw_circle(knob, 22.0, Color(0.95, 0.98, 1, 0.92))
+	draw_arc(knob, 22.0, 0, TAU, 48, Color.WHITE, 2.0, true)
+	draw_circle(knob - Vector2(5, 6), 6.0, Color(1, 1, 1, 0.46))

@@ -7,10 +7,10 @@ func _initialize() -> void:
 
 func _run() -> void:
 	var rows: Array[Dictionary] = []
-	for district in ["commercial", "suburban", "industrial", "roads"]:
+	for district in ["commercial", "suburban", "industrial", "roads", "vehicles", "characters"]:
 		var path: String = "res://assets/game/models/" + district
 		for file in DirAccess.get_files_at(path):
-			if not file.ends_with(".glb"):
+			if not file.ends_with(".glb") and not file.ends_with(".fbx"):
 				continue
 			var scene: PackedScene = load(path + "/" + file)
 			if scene == null:
@@ -22,6 +22,7 @@ func _run() -> void:
 				"model": district + "/" + file,
 				"min": [bounds.position.x, bounds.position.y, bounds.position.z],
 				"size": [bounds.size.x, bounds.size.y, bounds.size.z],
+				"animations": _animation_names(instance),
 			})
 			instance.free()
 	var output := FileAccess.open("res://artifacts/model_bounds.json", FileAccess.WRITE)
@@ -29,6 +30,16 @@ func _run() -> void:
 	output.close()
 	print(JSON.stringify(rows))
 	quit()
+
+
+func _animation_names(node: Node) -> Array[String]:
+	var names: Array[String] = []
+	if node is AnimationPlayer:
+		for animation in node.get_animation_list():
+			names.append(str(animation))
+	for child in node.get_children():
+		names.append_array(_animation_names(child))
+	return names
 
 
 func _bounds(node: Node, parent_transform: Transform3D) -> AABB:

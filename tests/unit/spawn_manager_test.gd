@@ -15,7 +15,9 @@ func run() -> void:
 	for placement in layout.objects:
 		if placement.variant != "":
 			variants[placement.variant] = true
-	expect(districts.size() == 4, "商业/住宅/工业/道路四类素材用途")
+	var required_districts := ["commercial", "suburban", "industrial", "roads"]
+	expect(required_districts.all(func(district: String) -> bool: return districts.has(district)), "商业/住宅/工业/道路四类素材用途")
+	expect(districts.has("vehicles") and districts.has("characters"), "车辆和行人进入正式城市场景")
 	expect(variants.has("a") and variants.has("b"), "Commercial 混合配色")
 	var target: Swallowable
 	for object in spawn.objects.values():
@@ -23,6 +25,21 @@ func run() -> void:
 			target = object
 			break
 	expect(target != null, "存在出生可吞物体")
+	var walker: Swallowable
+	for object in spawn.objects.values():
+		if object.model_id == "pedestrian":
+			walker = object
+			break
+	expect(walker != null and walker._animation_player != null, "动态行人具有跑步动画播放器")
+	var walker_start := walker.position
+	walker.advance_route(0.5)
+	expect(walker.position.distance_to(walker_start) > 0.1, "行人按固定步进沿路线跑步")
+	expect(walker._animation_player.current_animation_position > 0.0, "跑步动画随逻辑时间推进")
+	expect(walker.claim(99), "动态物件可进入认领事务")
+	var claimed_position := walker.position
+	walker.advance_route(0.5)
+	expect(walker.position.is_equal_approx(claimed_position), "认领后路线和动画立即停止")
+	walker.cancel()
 	var hole := HoleActor.new()
 	hole.effective_radius = 1.0
 	hole.position = target.position

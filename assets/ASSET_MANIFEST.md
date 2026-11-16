@@ -4,10 +4,10 @@
 
 ## 当前状态
 
-- 以下 6 套素材的原始 ZIP、预览和授权记录作为来源档案保留；其中 Commercial、Roads、Suburban、Industrial 的已选 GLB 以及 UI Pack 的 6 个音效已复制到 `assets/game/` 正式使用。
-- 正式模型共注册 29 项，路径与玩法参数见 `config/model_catalog.json`；四个模型目录均随附对应 Kenney `License.txt`。
+- 以下 8 套素材的原始 ZIP、预览和授权记录作为来源档案保留；其中 Commercial、Roads、Suburban、Industrial 的已选 GLB、Car Kit 车辆、Animated Characters 行人及 UI Pack 的 6 个音效已复制到 `assets/game/` 正式使用。
+- 正式模型共注册 40 项（含 1 项原创程序化 3D 鸭子），路径与玩法参数见 `config/model_catalog.json`；各外部模型目录均随附对应 Kenney `License.txt`。
 - 素材来自 Kenney 官方网站，原始压缩包、解压文件和预览图均保留在本机项目中；候选解压目录不进入 Git。
-- 6 个 ZIP 均已通过完整性检查，并检查了解压路径穿越和符号链接；统一验收会再次核对原始 ZIP SHA-256。
+- 8 个 ZIP 均已通过完整性检查，并检查了解压路径穿越和符号链接；统一验收会再次核对原始 ZIP SHA-256。
 - 各包内的 `License.txt` 均明确标注 **Creative Commons Zero（CC0）**，允许个人、教育和商业使用，署名不是强制要求。
 - `candidates/` 与 `previews/` 下已放置 `.gdignore`，Godot 不会自动导入这些候选文件。
 - 中文字体 Noto Sans SC 使用 SIL OFL 1.1；字体、音效来源、固定版本和 SHA-256 详见 `game/ASSETS.md`。
@@ -106,6 +106,27 @@ assets/
 - **范围建议**：需要重新统一颜色、形状和尺寸，不能默认认为与参考视频 UI 风格一致。
 - **预览**：`previews/ui-pack-sample.png`
 - **ZIP SHA-256**：`a8a14a234911eb648c062622915c93e79e94e97cb7f9f375a70f6617f1174318`
+
+### 7. Car Kit — 正式车辆来源
+
+- **官方来源**：https://kenney.nl/assets/car-kit
+- **作者/发布方**：Kenney
+- **包内版本**：3.1
+- **授权**：CC0，原文见 `candidates/car-kit/extracted/License.txt`
+- **项目用途**：轿车、出租车、警车、货车和救护车，以实时 GLB 模型沿固定路线行驶并参与吞噬事务。
+- **ZIP SHA-256**：`fac7dacac5c7874348cf19729af3ef205f3d366493edaf0a827d93f4fdf3d0c4`
+
+### 8. Animated Characters Protagonists — 正式行人来源
+
+- **官方来源**：https://kenney.nl/assets/animated-characters-protagonists
+- **作者/发布方**：Kenney
+- **授权**：CC0，原文见 `candidates/animated-characters-protagonists/extracted/License.txt`
+- **项目用途**：四种皮肤的真实骨骼行人；独立 `run.fbx` 动画合并到角色骨架，并由固定逻辑步进手动推进。
+- **ZIP SHA-256**：`ec3787de70fa2200256848d74201b10f6b6c3126594e9857bf989753312c2b84`
+
+### 原创程序化鸭子
+
+- `scripts/rendering/duck_visual.gd` 使用低多边形球体和盒体构建真实 3D 网格，不依赖外部模型或预渲染图片；沿水面路线游动，使用与其他物件相同的吞噬事务。
 
 ## 正式使用与后续边界
 

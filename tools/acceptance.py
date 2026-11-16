@@ -32,6 +32,8 @@ EXPECTED_HASHES = {
     "assets/candidates/city-kit-industrial/source.zip": "5b381164e5760f3830a2dbee43b972deee38b2a695d091b56e238ab2910c96d2",
     "assets/candidates/tiny-town/source.zip": "9768692dccff1d706408a5aedd6ca4f6cd1409506cbc84cb2f862919764be977",
     "assets/candidates/ui-pack/source.zip": "a8a14a234911eb648c062622915c93e79e94e97cb7f9f375a70f6617f1174318",
+    "assets/candidates/car-kit/source.zip": "fac7dacac5c7874348cf19729af3ef205f3d366493edaf0a827d93f4fdf3d0c4",
+    "assets/candidates/animated-characters-protagonists/source.zip": "ec3787de70fa2200256848d74201b10f6b6c3126594e9857bf989753312c2b84",
 }
 
 CHECKPOINTS = [
@@ -122,6 +124,8 @@ def audit() -> dict:
         "assets/game/models/suburban/License.txt",
         "assets/game/models/industrial/License.txt",
         "assets/game/models/roads/License.txt",
+        "assets/game/models/vehicles/License.txt",
+        "assets/game/models/characters/License.txt",
         "assets/game/audio/LICENSE-Kenney-CC0.txt",
         "assets/game/fonts/OFL.txt",
     ]
@@ -131,8 +135,8 @@ def audit() -> dict:
             failures.append(f"授权正文缺失: {relative}")
     catalog = load_json("config/model_catalog.json")
     models = catalog.get("models", [])
-    if len(models) != 29:
-        failures.append(f"模型注册数量不是 29: {len(models)}")
+    if len(models) != 40:
+        failures.append(f"模型注册数量不是 40: {len(models)}")
     for model in models:
         resource = str(model.get("path", "")).removeprefix("res://")
         if not resource or not (ROOT / resource).is_file():

@@ -19,6 +19,12 @@ var area: Area3D
 var _origin := Vector3.ZERO
 var _initial_scale := Vector3.ONE
 var _initial_rotation := Vector3.ZERO
+var motion_route := PackedVector3Array()
+var motion_speed: float = 0.0
+var route_distance: float = 0.0
+var _route_length: float = 0.0
+var _route_segment_lengths: Array[float] = []
+var _animation_player: AnimationPlayer
 
 
 func setup(entry: Dictionary, stable_id: int, model: Node3D) -> void:
@@ -43,12 +49,58 @@ func setup(entry: Dictionary, stable_id: int, model: Node3D) -> void:
 	area.add_child(collision)
 	add_child(area)
 	set_meta("object_id", object_id)
+	_animation_player = _find_animation_player(model_root)
+
+
+func configure_route(points: PackedVector3Array, speed: float, phase: float = 0.0) -> void:
+	motion_route = points
+	motion_speed = speed
+	_route_segment_lengths.clear()
+	_route_length = 0.0
+	for index in motion_route.size():
+		var length := motion_route[index].distance_to(motion_route[(index + 1) % motion_route.size()])
+		_route_segment_lengths.append(length)
+		_route_length += length
+	route_distance = fposmod(phase, _route_length) if _route_length > 0.0 else 0.0
+	advance_route(0.0)
 
 
 func capture_transform() -> void:
 	_origin = position
 	_initial_scale = scale
 	_initial_rotation = rotation
+
+
+func advance_route(delta: float) -> void:
+	if state != State.IDLE or motion_route.size() < 2 or _route_length <= 0.0:
+		return
+	route_distance = fposmod(route_distance + motion_speed * delta, _route_length)
+	var remaining := route_distance
+	for index in motion_route.size():
+		var segment_length := _route_segment_lengths[index]
+		if remaining <= segment_length or index == motion_route.size() - 1:
+			var start := motion_route[index]
+			var end := motion_route[(index + 1) % motion_route.size()]
+			var direction := (end - start).normalized()
+			position = start.lerp(end, clampf(remaining / segment_length, 0.0, 1.0))
+			if not direction.is_zero_approx():
+				rotation.y = atan2(-direction.x, -direction.z)
+			break
+		remaining -= segment_length
+	if _animation_player != null:
+		_animation_player.advance(delta)
+	if model_id == "duck":
+		model_root.position.y = 0.03 + sin(route_distance * 3.0) * 0.035
+
+
+func _find_animation_player(node: Node) -> AnimationPlayer:
+	if node is AnimationPlayer:
+		return node
+	for child in node.get_children():
+		var found := _find_animation_player(child)
+		if found != null:
+			return found
+	return null
 
 
 func claim(owner_id: int) -> bool:

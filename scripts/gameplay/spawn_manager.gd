@@ -30,6 +30,8 @@ func build(layout: CityGenerator.Layout) -> void:
 		object.setup(entry, placement.id, model)
 		object.position = placement.position
 		object.rotation_degrees.y = float(placement.rotation_y)
+		if placement.has("route"):
+			object.configure_route(placement.route, float(placement.route_speed))
 		object.capture_transform()
 		objects_root.add_child(object)
 		objects[object.object_id] = object

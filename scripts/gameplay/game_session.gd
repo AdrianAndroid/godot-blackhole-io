@@ -103,6 +103,9 @@ func step(delta: float) -> void:
 	remaining_time = maxf(0.0, remaining_time - delta)
 	objective.match_time += delta
 	var direction := drive_input if driver_enabled else input_controller.input_vector
+	for object in spawn_manager.objects.values():
+		if is_instance_valid(object):
+			object.advance_route(delta)
 	if player.alive:
 		player.step(delta, direction)
 	for opponent in opponents:

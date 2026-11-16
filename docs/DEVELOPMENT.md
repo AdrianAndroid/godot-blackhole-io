@@ -132,6 +132,7 @@ python3 tools/acceptance.py --verify-failure-exit
 
 ```bash
 /usr/local/bin/godot --headless --path . --editor --quit
+mkdir -p build/web
 /usr/local/bin/godot --headless --path . --export-release "Web / GitHub Pages" build/web/play.html
 cp web/index.html build/web/index.html
 touch build/web/.nojekyll

@@ -7,6 +7,8 @@ func run() -> void:
 	tree.root.add_child(session)
 	session.automatic = false
 	session.audio.muted = true
+	var level_events: Array[int] = []
+	session.growth.changed.connect(func(level: int, _radius: float) -> void: level_events.append(level))
 	var driver := AutoDriver.new()
 	driver.avoid_all_opponents = true
 	var result := driver.run(session)
@@ -17,8 +19,9 @@ func run() -> void:
 	var types := {}
 	for event in session.event_log:
 		types[event.type] = true
-	for required in ["object_settled", "level_up", "tower_spawned", "match_finished"]:
+	for required in ["object_settled", "tower_spawned", "match_finished"]:
 		expect(types.has(required), "整局事件包含 " + required)
+	expect(not level_events.is_empty(), "整局实际触发等级提升信号，不受有界日志滚动影响")
 	expect(session.tower != null and session.tower.state == Swallowable.State.SETTLED, "高塔实际完全消失")
 	expect(driver.ticks <= 6000 and session.remaining_time >= 0.0, "完整 10 分钟加速驱动有界")
 	var frozen := str(session.snapshot())

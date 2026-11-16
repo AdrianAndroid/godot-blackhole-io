@@ -1,7 +1,7 @@
 class_name CityGenerator
 extends RefCounted
 
-const GENERATION_VERSION: int = 3
+const GENERATION_VERSION: int = 4
 const MAP_SIZE := Vector2(112, 112)
 const ROAD_TILE_SIZE: float = 4.0
 const ROAD_COORDINATES: Array[float] = [-48.0, -32.0, -16.0, 0.0, 16.0, 32.0, 48.0]
@@ -13,6 +13,9 @@ const ROAD_EAST_LIMIT: float = 48.0
 const TOWER_POSITION := Vector3(40, 0, 46)
 const PLACEMENT_CELL_SIZE: float = 8.0
 const MAX_FOOTPRINT_RADIUS: float = 4.0
+const SMALL_PROP_MODEL_IDS: Array[String] = [
+	"cone", "cone", "traffic_light", "construction_light", "road_sign_stop", "road_sign_street", "street_light",
+]
 const BUILDING_MODEL_IDS: Array[String] = [
 	"commercial_low_a", "commercial_low_b", "commercial_low_c", "commercial_a", "commercial_c",
 	"skyscraper_a", "skyscraper_b", "skyscraper_c", "house_a", "house_b", "house_c", "house_d",
@@ -68,8 +71,11 @@ func _generate_attempt(seed_value: int, attempt: int) -> Layout:
 		Vector3(-2.8, 0, -1.5), Vector3(-1.0, 0, -2.8), Vector3(1.0, 0, -2.8), Vector3(2.8, 0, -1.5),
 		Vector3(-2.8, 0, 1.5), Vector3(-1.0, 0, 2.8), Vector3(1.0, 0, 2.8), Vector3(2.8, 0, 1.5),
 		Vector3(-4.2, 0, 0), Vector3(4.2, 0, 0), Vector3(0, 0, -4.2), Vector3(0, 0, 4.2),
+		Vector3(-6.0, 0, -1.5), Vector3(-6.0, 0, 1.5), Vector3(6.0, 0, -1.5), Vector3(6.0, 0, 1.5),
+		Vector3(-1.5, 0, -6.0), Vector3(1.5, 0, -6.0), Vector3(-1.5, 0, 6.0), Vector3(1.5, 0, 6.0),
+		Vector3(-4.4, 0, -4.4), Vector3(4.4, 0, -4.4), Vector3(-4.4, 0, 4.4), Vector3(4.4, 0, 4.4),
 	]:
-		var starter_id := "cone" if next_id % 2 == 0 else "traffic_light"
+		var starter_id: String = SMALL_PROP_MODEL_IDS[next_id % SMALL_PROP_MODEL_IDS.size()]
 		if _can_place(layout, starter, 0.24):
 			_append_object(layout, _placement(next_id, starter_id, starter, rng))
 			next_id += 1
@@ -145,6 +151,27 @@ func _populate_block(layout: Layout, center: Vector3, next_id: int, rng: RandomN
 		if _can_place(layout, prop_position, prop_radius):
 			_append_object(layout, _placement(next_id, prop_id, prop_position, rng))
 			next_id += 1
+	# Keep a reliable supply of level-one targets on every block, not only large scenery.
+	for side in 4:
+		for along in [-3.2, 3.2]:
+			var offset := Vector3.ZERO
+			match side:
+				0:
+					offset = Vector3(-6.15, 0, along)
+				1:
+					offset = Vector3(6.15, 0, along)
+				2:
+					offset = Vector3(along, 0, -6.15)
+				3:
+					offset = Vector3(along, 0, 6.15)
+			var prop_position := center + offset
+			var prop_id: String = SMALL_PROP_MODEL_IDS[rng.randi_range(0, SMALL_PROP_MODEL_IDS.size() - 1)]
+			var prop_radius := float(_catalog_entry(prop_id).footprint_radius)
+			if prop_position.x + prop_radius > BUILDING_EAST_LIMIT:
+				continue
+			if _can_place(layout, prop_position, prop_radius):
+				_append_object(layout, _placement(next_id, prop_id, prop_position, rng))
+				next_id += 1
 	return next_id
 
 
@@ -167,10 +194,14 @@ func _populate_dynamic(layout: Layout, next_id: int, rng: RandomNumberGenerator)
 				Vector3(block_x + 6.8, 0, block_z - 6.8),
 			])
 			var pedestrian_speed := rng.randf_range(0.65, 1.05)
-			for slot in 4:
-				var phase := (float(slot) + 0.15 * float(pedestrian_index % 2)) / 4.0
+			var pedestrians_placed := 0
+			for slot in 8:
+				if pedestrians_placed >= 4:
+					break
+				var phase := (float(slot) + 0.15 * float(pedestrian_index % 2)) / 8.0
 				if _add_dynamic(layout, next_id, "pedestrian", pedestrian_route, pedestrian_speed, str(pedestrian_index % 4), rng, phase):
 					next_id += 1
+					pedestrians_placed += 1
 				pedestrian_index += 1
 			var lane := 0.72 if vehicle_index % 2 == 0 else -0.72
 			var vehicle_route := PackedVector3Array([
@@ -232,6 +263,8 @@ func _point_on_route(route: PackedVector3Array, distance: float) -> Vector3:
 func validate_layout(layout: Layout) -> Array[String]:
 	var errors: Array[String] = []
 	var starter_count := 0
+	var starter_prop_count := 0
+	var static_small_count := 0
 	var nearby_buildings := 0
 	var districts: Dictionary = {}
 	var dynamic_counts := {"vehicles": 0, "characters": 0, "duck": 0}
@@ -249,6 +282,10 @@ func validate_layout(layout: Layout) -> Array[String]:
 		var position: Vector3 = object.position
 		if absf(position.x) > layout.map_size.x * 0.5 or absf(position.z) > layout.map_size.y * 0.5:
 			errors.append("目标越出地图")
+		if float(entry.footprint_radius) < 0.38 and not object.has("route"):
+			static_small_count += 1
+			if position.distance_to(layout.player_spawn) < 12.0:
+				starter_prop_count += 1
 		if float(entry.footprint_radius) < 0.38 and position.distance_to(layout.player_spawn) < 12.0:
 			starter_count += 1
 		if BUILDING_MODEL_IDS.has(str(object.model_id)) and position.distance_to(layout.player_spawn) <= 20.0:
@@ -257,8 +294,8 @@ func validate_layout(layout: Layout) -> Array[String]:
 			errors.append("高塔预留被占用")
 		if position.distance_to(layout.player_spawn) < float(entry.footprint_radius) + 0.5:
 			errors.append("出生点被物体占用")
-	if starter_count < 4:
-		errors.append("缺少出生小物体")
+	if starter_count < 24 or starter_prop_count < 20 or static_small_count < 280:
+		errors.append("缺少出生小物体或全图静态小物件")
 	if nearby_buildings < 8:
 		errors.append("出生点 20 米内建筑不足 8 栋")
 	if dynamic_counts.vehicles < 20 or dynamic_counts.characters < 80 or dynamic_counts.duck < 12:

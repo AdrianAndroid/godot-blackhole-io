@@ -61,7 +61,7 @@ python3 -I tools/acceptance.py --verify-failure-exit
 
 - `InputController.handle_event()` 可直接注入鼠标、触摸、拖动和取消事件；`input_vector`、活动触摸 ID 和摇杆状态可断言。
 - 第二指不夺取活动触摸 ID；取消、暂停和结算必须清输入。
-- `FollowCamera.snapshot()` 提供投影、位置和观察范围。成长仅改变观察范围，不直接改变移动速度、资格或奖励。
+- `FollowCamera.snapshot()` 提供投影、位置和观察范围。玩家初始速度为 5.2，速度与镜头观察范围按同一半径曲线增长，满级为 17.212；吞噬资格和奖励仍由各自规则决定，投影切换不修改这些玩法状态。
 - `tests/integration/match_controls_test.gd` 用同一完整输入轨迹分别运行透视和正交，并比较最终逻辑快照。
 - `input_edge` 截图把玩家和摇杆放在地图角落；`occlusion` 检查大型不可吞建筑遮挡，`water_hole` 检查水面黑洞。HUD 的 `safe_rects` 不得超出 432×960。
 

@@ -23,6 +23,41 @@ func run() -> void:
 		expect(absf(actor.position.z) <= 15.0 - actor.effective_radius + 0.0001, "Z 边界不穿越")
 	actor.free()
 
+	var initial_hole := HoleActor.new()
+	initial_hole.map_size = Vector2(200, 200)
+	var grown_hole := HoleActor.new()
+	grown_hole.map_size = Vector2(200, 200)
+	grown_hole.effective_radius = GrowthManager.RADII.back()
+	initial_hole.step(1.0, Vector2.RIGHT)
+	grown_hole.step(1.0, Vector2.RIGHT)
+	expect_near(initial_hole.position.x, 5.2, 0.0001, "初始移动速度保持不变")
+	expect(grown_hole.position.x > initial_hole.position.x * 3.0, "满级黑洞相同输入下位移超过初始三倍")
+	var previous_speed := 0.0
+	var speed_grows := true
+	for radius in GrowthManager.RADII:
+		grown_hole.effective_radius = radius
+		var speed := grown_hole.current_move_speed()
+		speed_grows = speed_grows and speed > previous_speed
+		previous_speed = speed
+	expect(speed_grows, "十九级体型的移动速度逐级提升")
+	initial_hole.position = Vector3.ZERO
+	initial_hole.step(1.0, Vector2.ONE)
+	expect_near(initial_hole.position.length(), initial_hole.current_move_speed(), 0.0001, "对角输入归一化不会额外加速")
+	initial_hole.free()
+	grown_hole.free()
+	var partitioned_holes: Array[HoleActor] = []
+	for rate in [30, 60, 120, 144]:
+		var sampled_hole := HoleActor.new()
+		sampled_hole.map_size = Vector2(200, 200)
+		sampled_hole.effective_radius = 2.2
+		for index in rate:
+			sampled_hole.step(1.0 / float(rate), Vector2(0.8, 0.6))
+		partitioned_holes.append(sampled_hole)
+	var baseline_hole_position := partitioned_holes[0].position
+	for sampled_hole in partitioned_holes:
+		expect(sampled_hole.position.distance_to(baseline_hole_position) < 0.0001, "成长后移动在不同步长划分下结果一致")
+		sampled_hole.free()
+
 	var rig := FollowCamera.new()
 	rig.map_size = Vector2(20, 30)
 	rig._ready()

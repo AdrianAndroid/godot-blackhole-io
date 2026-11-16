@@ -6,6 +6,8 @@
 
 # Automated verification output
 artifacts/
+__pycache__/
+*.pyc
 
 # Local Web exports and CI tool downloads
 build/

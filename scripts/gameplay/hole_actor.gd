@@ -46,10 +46,16 @@ func build() -> void:
 	add_child(detection_area)
 
 
+func current_move_speed() -> float:
+	# Match the camera's growth curve so a larger hole keeps its screen-space pace.
+	return move_speed * (1.0 + maxf(0.0, effective_radius - 0.38) * 0.5)
+
+
 func step(delta: float, direction: Vector2) -> void:
 	if not alive:
 		return
-	var motion := Vector3(direction.x, 0, direction.y) * move_speed * delta
+	var limited_direction := direction.limit_length(1.0)
+	var motion := Vector3(limited_direction.x, 0, limited_direction.y) * current_move_speed() * delta
 	var next := position + motion
 	var limit := map_size * 0.5 - Vector2.ONE * effective_radius
 	next.x = clampf(next.x, -maxf(0, limit.x), maxf(0, limit.x))

@@ -1,0 +1,60 @@
+class_name HoleActor
+extends Node3D
+
+var effective_radius: float = 0.38:
+	set(value):
+		effective_radius = value
+		if visual != null:
+			visual.effective_radius = value
+		_update_area_radius()
+var move_speed: float = 5.2
+var map_size := Vector2(96, 96)
+var faction_color := Color("3298ff"):
+	set(value):
+		faction_color = value
+		if visual != null:
+			visual.faction_color = value
+var visual: HoleVisual
+var detection_area: Area3D
+var detection_shape: SphereShape3D
+var alive: bool = true
+
+
+func _ready() -> void:
+	build()
+
+
+func build() -> void:
+	if visual != null:
+		return
+	visual = HoleVisual.new()
+	visual.effective_radius = effective_radius
+	visual.faction_color = faction_color
+	add_child(visual)
+	detection_area = Area3D.new()
+	detection_area.name = "SwallowBroadPhase"
+	var collision := CollisionShape3D.new()
+	detection_shape = SphereShape3D.new()
+	detection_shape.radius = effective_radius
+	collision.shape = detection_shape
+	detection_area.add_child(collision)
+	add_child(detection_area)
+
+
+func step(delta: float, direction: Vector2) -> void:
+	if not alive:
+		return
+	if visual != null:
+		visual.step(delta)
+	var motion := Vector3(direction.x, 0, direction.y) * move_speed * delta
+	var next := position + motion
+	var limit := map_size * 0.5 - Vector2.ONE * effective_radius
+	next.x = clampf(next.x, -maxf(0, limit.x), maxf(0, limit.x))
+	next.z = clampf(next.z, -maxf(0, limit.y), maxf(0, limit.y))
+	next.y = position.y
+	position = next
+
+
+func _update_area_radius() -> void:
+	if detection_shape != null:
+		detection_shape.radius = effective_radius

@@ -6,13 +6,13 @@ func run() -> void:
 	_unlock_with_buildings(session)
 	expect(session.objective.completion() == 1.0, "普通建筑恰好或超过 100% 封顶")
 	expect(session.objective.knockdowns == 0 and session.living_opponents() == 4, "零击倒且四对手存活仍解锁")
-	expect(session.tower != null, "唯一金色高塔出现")
+	expect(session.tower != null, "唯一深蓝终点塔出现")
 	var tower_id := session.tower.get_instance_id()
 	var score := session.objective.current_score
 	session.objective.settle({"object_id": 999001, "kind": "normal", "score": 100, "coins": 0})
 	expect(session.tower.get_instance_id() == tower_id, "重复越过 100% 不重建高塔")
 	expect(session.objective.current_score == score + 100 and session.objective.completion() == 1.0, "超过目标仍累计分数且完成度封顶")
-	expect(session.hud.direction_label.text.contains("高塔"), "高塔方向指引")
+	expect(session.hud.direction_label.text.contains("终点塔"), "高塔方向指引")
 	session.free()
 
 	var victory := _session(8101)
@@ -22,9 +22,11 @@ func run() -> void:
 	victory.player.position = victory.tower.position
 	victory.step(0.01)
 	expect(victory.tower.state == Swallowable.State.SINKING and victory.state == GameSession.State.PLAYING, "高塔动画中尚未胜利")
+	expect(victory.camera_rig.finale_active and victory.hud.message_label.text.contains("下沉"), "吞塔认领启动镜头演出但不提前胜利")
 	victory.step(1.3)
 	expect(victory.result.get("victory") == true and victory.result.get("reason") == "tower", "高塔完全下沉后胜利")
-	expect(victory.hud.result_title.text == "胜利！" and victory.hud.result_panel.visible, "胜利结算文字与面板")
+	expect(victory.hud.result_title.text == "抵达终点！" and victory.hud.result_panel.visible, "抵达终点结算文字与面板")
+	expect(victory.camera_rig.finale_blend >= 0.99 and victory.camera_rig.zoom > 1.4, "高塔完全下沉时镜头已平滑拉远")
 	expect(victory.objective.current_score == unlocked_score and victory.growth.experience == 0, "高塔不追加普通奖励")
 	victory.free()
 

@@ -89,7 +89,7 @@ func build() -> void:
 
 
 func step(delta: float) -> void:
-	animation_time = 0.0 if animation_time < 0.0 else animation_time + delta
+	animation_time = maxf(0.0, animation_time) + delta
 	feedback_pulse = move_toward(feedback_pulse, 0.0, delta * 3.5)
 	if glow_material != null:
 		glow_material.set_shader_parameter("strength", 1.0 + feedback_pulse * 1.8)

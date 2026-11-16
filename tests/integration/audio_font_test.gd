@@ -6,7 +6,7 @@ func run() -> void:
 		var stream: AudioStream = load(AudioManager.CUES[cue])
 		expect(stream != null and stream.get_length() > 0.0, "音效资源有效: " + cue)
 	var font: Font = load("res://assets/game/fonts/NotoSansSC-Variable.ttf")
-	var chinese := "黑洞城市第关适中开始对局拖动摇杆移动吞噬完成目标体型金币击倒连击最大金色高塔已出现东南北胜利本失败重试同一张返回新暂停继续时间"
+	var chinese := "黑洞城市第关适中开始对局拖动摇杆移动吞噬完成目标体型金币击倒连击最大金色高塔已出现东南北胜利本失败重试同一张返回新暂停继续时间终点解锁度下沉抵达"
 	var missing: Array[int] = []
 	for index in chinese.length():
 		if not font.has_char(chinese.unicode_at(index)):

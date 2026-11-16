@@ -240,7 +240,7 @@ func _style_button(button: Button, color: Color, border: Color) -> void:
 
 
 func show_result(result: Dictionary) -> void:
-	result_title.text = "胜利！" if result.victory else "本局失败"
+	result_title.text = "抵达终点！" if result.victory else "本局失败"
 	result_title.add_theme_color_override("font_color", Color("ffe34e") if result.victory else Color("ff8c9c"))
 	result_stats.text = "完成度 %d%%\n目标分 %d · 金币 %d\n体型 %d · 击倒 %d" % [roundi(result.completion * 100), result.score, result.coins, result.level, result.knockdowns]
 	result_shade.show()

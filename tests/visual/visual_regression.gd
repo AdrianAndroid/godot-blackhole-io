@@ -260,6 +260,8 @@ func _freeze_holes(session: GameSession) -> void:
 		opponent.actor.visual.animation_time = 2.0
 	if session.player_death_target != null:
 		(session.player_death_target.model_root as HoleVisual).animation_time = 2.0
+	if session.tower != null:
+		(session.tower.model_root as TowerVisual).animation_time = 2.0
 
 
 func _settle() -> void:

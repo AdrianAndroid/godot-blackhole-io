@@ -16,5 +16,5 @@ func run() -> void:
 		safe = safe and rect.position.x >= 0 and rect.position.y >= 0 and rect.end.x <= 432 and rect.end.y <= 960
 	expect(safe, "全部固定 HUD 区域位于竖屏安全范围")
 	hud.show_result({"victory": true, "completion": 1.0, "score": 1300, "coins": 8, "level": 19, "knockdowns": 2})
-	expect(hud.result_panel.visible and hud.result_shade.visible and hud.result_title.text == "胜利！", "结算面板和遮罩同步显示")
+	expect(hud.result_panel.visible and hud.result_shade.visible and hud.result_title.text == "抵达终点！", "结算面板和遮罩同步显示")
 	hud.free()

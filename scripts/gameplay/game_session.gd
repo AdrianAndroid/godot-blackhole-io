@@ -130,6 +130,11 @@ func step(delta: float) -> void:
 
 func _on_swallow_claimed(object: Swallowable, hole: HoleActor) -> void:
 	hole.visual.trigger_pulse(0.5)
+	if object.kind == "tower" and hole == player:
+		camera_rig.set_finale(true)
+		camera_rig.add_shake(0.08)
+		hud.show_message("终点塔下沉中…")
+		_record("tower_swallow_started", {"position": object.position})
 	if object.kind in ["normal", "opponent"]:
 		var effect := AttractionBurst.new()
 		add_child(effect)
@@ -230,7 +235,7 @@ func _spawn_tower() -> void:
 		return
 	tower = spawn_manager.spawn_tower(layout.tower_position)
 	audio.play("tower_spawn")
-	hud.show_message("金色高塔已出现！")
+	hud.show_message("终点塔已解锁 · 完成度 100%")
 	_record("tower_spawned", {"position": tower.position})
 
 
@@ -306,7 +311,7 @@ func _update_hud() -> void:
 		var offset := tower.position - player.position
 		var horizontal := "东" if offset.x >= 0 else "西"
 		var vertical := "南" if offset.z >= 0 else "北"
-		hud.set_tower_direction("金色高塔 · %s%s %dm" % [vertical, horizontal, roundi(offset.length())])
+		hud.set_tower_direction("终点塔 · %s%s %dm" % [vertical, horizontal, roundi(offset.length())])
 
 
 func living_opponents() -> int:

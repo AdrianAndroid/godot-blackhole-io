@@ -13,6 +13,8 @@ var initialized: bool = false
 var shake_strength: float = 0.0
 var visual_time: float = 0.0
 var shake_offset := Vector3.ZERO
+var finale_active: bool = false
+var finale_blend: float = 0.0
 
 
 func _ready() -> void:
@@ -50,7 +52,8 @@ func step(delta: float, target_position: Vector3, radius: float) -> void:
 		initialized = true
 	else:
 		position = position.lerp(desired, 1.0 - exp(-smoothing * delta))
-	zoom = 1.0 + maxf(0.0, radius - 0.38) * 0.5
+	finale_blend = move_toward(finale_blend, 1.0 if finale_active else 0.0, delta * 1.25)
+	zoom = (1.0 + maxf(0.0, radius - 0.38) * 0.5) * lerpf(1.0, 1.55, finale_blend)
 	var margin := Vector2(7.0, 9.0) * zoom
 	var half := map_size * 0.5
 	position.x = clampf(position.x, -half.x + margin.x, half.x - margin.x)
@@ -59,6 +62,10 @@ func step(delta: float, target_position: Vector3, radius: float) -> void:
 	shake_strength = move_toward(shake_strength, 0.0, delta * 0.65)
 	shake_offset = Vector3(sin(visual_time * 71.0), cos(visual_time * 83.0) * 0.35, cos(visual_time * 59.0)) * shake_strength
 	_update_camera_transform()
+
+
+func set_finale(active: bool) -> void:
+	finale_active = active
 
 
 func add_shake(strength: float) -> void:

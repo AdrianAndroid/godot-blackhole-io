@@ -49,15 +49,16 @@ func advance_visuals(delta: float, hole_position: Vector3, hole_radius: float) -
 		var material := water_surface.material_override as ShaderMaterial
 		material.set_shader_parameter("wave_time", wave_time)
 	occlusion_fader.step(delta, hole_position, hole_radius)
+	for object in objects.values():
+		if is_instance_valid(object) and object.model_root is TowerVisual and object.state != Swallowable.State.SETTLED:
+			(object.model_root as TowerVisual).step(delta)
 
 
 func spawn_tower(position_value: Vector3) -> Swallowable:
-	var entry := {"id": "golden_tower", "footprint_radius": 3.0, "xp": 0, "score": 0, "coins": 0}
-	var model := registry.instantiate("skyscraper_b")
-	model.scale *= 1.5
-	_tint_gold(model)
+	var entry := {"id": "final_tower", "footprint_radius": 3.0, "xp": 0, "score": 0, "coins": 0}
+	var model := TowerVisual.new()
 	var tower := Swallowable.new()
-	tower.name = "GoldenTower"
+	tower.name = "FinalTower"
 	tower.kind = "tower"
 	tower.setup(entry, 1000000, model)
 	tower.position = position_value
@@ -66,17 +67,3 @@ func spawn_tower(position_value: Vector3) -> Swallowable:
 	add_child(tower)
 	objects[tower.object_id] = tower
 	return tower
-
-
-func _tint_gold(node: Node) -> void:
-	if node is MeshInstance3D:
-		var gold := StandardMaterial3D.new()
-		gold.albedo_color = Color("ffc83d")
-		gold.metallic = 0.65
-		gold.roughness = 0.25
-		gold.emission_enabled = true
-		gold.emission = Color("8a4d00")
-		gold.emission_energy_multiplier = 0.35
-		node.material_override = gold
-	for child in node.get_children():
-		_tint_gold(child)

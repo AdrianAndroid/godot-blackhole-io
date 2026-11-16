@@ -46,4 +46,9 @@ func run() -> void:
 	rig.add_shake(0.12)
 	rig.step(0.05, logical_position, 0.38)
 	expect(rig.position == logical_position and rig.shake_offset.length() > 0.0, "镜头震动只偏移相机不修改逻辑跟随位置")
+	var normal_zoom := rig.zoom
+	rig.set_finale(true)
+	for tick in 10:
+		rig.step(0.1, logical_position, 0.38)
+	expect(rig.finale_blend == 1.0 and rig.zoom > normal_zoom * 1.4, "终点演出平滑拉远且两种投影共享观察范围")
 	rig.free()

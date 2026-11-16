@@ -5,7 +5,7 @@ var perspective_camera: Camera3D
 var orthographic_camera: Camera3D
 var projection: String = "perspective"
 var map_size := Vector2(96, 96)
-var base_offset := Vector3(0, 17, 15)
+var base_offset := Vector3(0, 20, 15)
 var base_orthographic_size: float = 24.0
 var zoom: float = 1.0
 var smoothing: float = 10.0

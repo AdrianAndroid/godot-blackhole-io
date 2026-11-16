@@ -136,13 +136,19 @@ func _prepare_checkpoint(checkpoint: String, session: GameSession) -> void:
 			drag.position = Vector2(150, 738)
 			session.input_controller.handle_event(drag)
 		"occlusion":
+			var occluder: Swallowable
 			for object in session.spawn_manager.objects.values():
 				if object.footprint_radius > session.player.effective_radius * 2.0:
+					occluder = object
 					session.player.position = object.position
 					session.camera_rig.step(1.0, session.player.position, session.player.effective_radius)
 					if object.state != Swallowable.State.IDLE:
 						failures.append("不可吞建筑被错误吞噬")
 					break
+			if occluder != null:
+				session.spawn_manager.advance_visuals(0.5, session.player.position, session.player.effective_radius)
+				if session.spawn_manager.occlusion_fader.fade_amount(occluder) < 0.99:
+					failures.append("遮挡建筑未完成半透明过渡")
 		"water_hole":
 			session.player.position = Vector3(34, 0, 0)
 			session.player.effective_radius = 1.2

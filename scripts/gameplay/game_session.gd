@@ -114,6 +114,7 @@ func step(delta: float) -> void:
 		_check_swallow_contacts()
 	swallow_manager.step(delta)
 	_process_completed_events()
+	spawn_manager.advance_visuals(delta, player.position, player.effective_radius)
 	camera_rig.step(delta, player.position, player.effective_radius)
 	_update_hud()
 

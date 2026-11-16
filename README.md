@@ -2,6 +2,14 @@
 
 Godot 4.7.2 + GDScript 的实时 3D 黑洞吞噬单局原型。包含随机城市、19 级成长、4 个路线对手、金币与完成度、最终深蓝终点塔、胜负结算、暂停、同图重试和首页新城市。当前完成 Mac 竖屏原型，抖音适配后置。
 
+## 游戏截图
+
+| 城市与黑洞 | 成长反馈 | 水面与鸭子 | 深蓝终点塔 | 抵达终点 |
+| :---: | :---: | :---: | :---: | :---: |
+| <img src="docs/screenshots/city.png" width="160" alt="城市中的黑洞"> | <img src="docs/screenshots/growth.png" width="160" alt="黑洞成长与吞噬反馈"> | <img src="docs/screenshots/water.png" width="160" alt="水面黑洞与鸭子"> | <img src="docs/screenshots/tower.png" width="160" alt="深蓝终点塔"> | <img src="docs/screenshots/victory.png" width="160" alt="抵达终点胜利结算"> |
+
+以上均为真实 Godot 渲染的 432×960 竖屏截图。
+
 ## 运行
 
 ```bash

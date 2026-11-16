@@ -7,8 +7,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
@@ -75,18 +73,46 @@ jobs:
           cp web/index.html build/web/index.html
           touch build/web/.nojekyll
 
-      - uses: actions/upload-pages-artifact@v3
+      - name: Upload the Web demo for publishing
+        uses: actions/upload-artifact@v4
         with:
+          name: web-demo
           path: build/web
+          include-hidden-files: true
+          retention-days: 1
 
   deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: build
+    permissions:
+      contents: write
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Check out the static publishing branch
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+
+      - name: Download the Web build
+        uses: actions/download-artifact@v4
+        with:
+          name: web-demo
+          path: /tmp/blackhole-web-demo
+
+      - name: Publish only Web runtime files to gh-pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm -rf --quiet .
+          cp /tmp/blackhole-web-demo/*.html /tmp/blackhole-web-demo/*.js .
+          cp /tmp/blackhole-web-demo/*.pck /tmp/blackhole-web-demo/*.wasm /tmp/blackhole-web-demo/*.png .
+          cp /tmp/blackhole-web-demo/.nojekyll .
+          git add --all
+          if git diff --cached --quiet; then
+            echo "No Web demo changes to publish"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "deploy: publish Web demo ${GITHUB_SHA}"
+          git push origin HEAD:gh-pages

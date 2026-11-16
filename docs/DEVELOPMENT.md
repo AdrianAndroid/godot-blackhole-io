@@ -152,7 +152,7 @@ python3 -I tools/web_smoke.py --url http://127.0.0.1:8765/play.html --output art
 
 ### 自动部署
 
-`.github/workflows/pages.yml` 在 `main` 推送或手动触发时运行：下载指定版本的官方 Godot Linux 引擎与导出模板、导入资源、导出 Web、复制介绍页并部署到 GitHub Pages。仓库 Pages 的部署来源必须选择 **GitHub Actions**，不是从分支发布静态文件。
+`.github/workflows/pages.yml` 在 `main` 推送或手动触发时运行：下载指定版本的官方 Godot Linux 引擎与导出模板、导入资源、导出 Web、复制介绍页，再把纯运行文件提交到独立的 `gh-pages` 分支。仓库 Pages 使用 **`gh-pages` / 根目录** 作为发布源；`main` 始终保持源码与 Mac 开发结构，Web 构建产物不会进入 `main`。分支更新后由 GitHub Pages 完成公开站点构建。
 
 公开地址：
 

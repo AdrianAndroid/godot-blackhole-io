@@ -59,7 +59,7 @@ python3 tools/acceptance.py
 - `tools/acceptance.py`：Mac 统一验收入口；`tools/web_smoke.py` 为真实 Chrome Web 冒烟测试。
 - `export_presets.cfg`：无多线程 Web 导出预设。
 - `web/index.html`：Pages 介绍页；实际 Godot 页面为 `play.html`。
-- `.github/workflows/pages.yml`：Web 构建和 Pages 自动部署。
+- `.github/workflows/pages.yml`：Web 构建及独立 `gh-pages` 分支自动发布。
 - `artifacts/`：本地自动验收输出，不进入 Git；`build/` 为本地导出目录，同样不提交。
 - `openspec/changes/add-video-referenced-mvp/`：本轮需求、设计和任务。
 

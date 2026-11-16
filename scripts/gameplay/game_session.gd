@@ -34,6 +34,7 @@ var camera_rig: FollowCamera
 var input_controller: InputController
 var hud: HudController
 var audio: AudioManager
+var attraction_bursts: Array[AttractionBurst] = []
 var _completed_events: Array[Dictionary] = []
 
 
@@ -51,6 +52,7 @@ func _build() -> void:
 	spawn_manager.build(layout)
 	swallow_manager = SwallowManager.new()
 	add_child(swallow_manager)
+	swallow_manager.claimed.connect(_on_swallow_claimed)
 	swallow_manager.completed.connect(_queue_completed)
 	player = HoleActor.new()
 	player.name = "Player"
@@ -114,9 +116,25 @@ func step(delta: float) -> void:
 		_check_swallow_contacts()
 	swallow_manager.step(delta)
 	_process_completed_events()
+	for index in range(attraction_bursts.size() - 1, -1, -1):
+		var effect := attraction_bursts[index]
+		effect.step(delta)
+		if effect.finished():
+			effect.queue_free()
+			attraction_bursts.remove_at(index)
+	hud.step(delta)
 	spawn_manager.advance_visuals(delta, player.position, player.effective_radius)
 	camera_rig.step(delta, player.position, player.effective_radius)
 	_update_hud()
+
+
+func _on_swallow_claimed(object: Swallowable, hole: HoleActor) -> void:
+	hole.visual.trigger_pulse(0.5)
+	if object.kind in ["normal", "opponent"]:
+		var effect := AttractionBurst.new()
+		add_child(effect)
+		effect.setup(object.global_position, hole, hole.faction_color)
+		attraction_bursts.append(effect)
 
 
 func _check_swallow_contacts() -> void:
@@ -174,6 +192,9 @@ func _process_completed_events() -> void:
 				if objective.settle(event):
 					var levels := growth.add_experience(int(event.xp))
 					player.effective_radius = growth.radius
+					player.visual.trigger_pulse(1.0)
+					camera_rig.add_shake(0.10 if event.kind == "opponent" else 0.035)
+					hud.show_devour(event, levels, _feedback_screen_position())
 					spawn_manager.objects.erase(int(event.object_id))
 					if event.kind == "opponent":
 						audio.play("knockdown")
@@ -181,13 +202,10 @@ func _process_completed_events() -> void:
 						_record("knockdown", event)
 					else:
 						audio.play("devour")
-						var feedback := "+%d 目标分" % int(event.score)
-						if int(event.coins) > 0:
-							feedback += "  ·  +%d 金币" % int(event.coins)
-						hud.show_message(feedback)
 						_record("object_settled", event)
 					if not levels.is_empty():
 						audio.play("level_up")
+						hud.show_message("体型提升 · Lv.%d" % growth.level)
 						_record("level_up", {"level": growth.level, "radius": growth.radius})
 			"player":
 				player_died = true
@@ -200,6 +218,11 @@ func _process_completed_events() -> void:
 		_finish(true, "tower")
 	elif remaining_time <= 0.0:
 		_finish(false, "timeout")
+
+
+func _feedback_screen_position() -> Vector2:
+	var camera := camera_rig.orthographic_camera if camera_rig.projection == "orthographic" else camera_rig.perspective_camera
+	return camera.unproject_position(player.global_position + Vector3(0, 0.4, 0))
 
 
 func _spawn_tower() -> void:

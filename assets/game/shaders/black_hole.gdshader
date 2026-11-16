@@ -18,11 +18,13 @@ void fragment() {
 	}
 	float angle = atan(centered.y, centered.x);
 	float time = animation_time >= 0.0 ? animation_time : TIME;
-	float spiral = sin(angle * 7.0 - time * 3.2 + radius * 14.0) * 0.5 + 0.5;
-	float rim = smoothstep(0.58, 0.96, radius);
-	float core = 1.0 - smoothstep(0.0, 0.72, radius);
-	vec3 edge = faction_color.rgb * (0.7 + spiral * 0.55);
-	ALBEDO = mix(edge, vec3(0.004, 0.006, 0.015), core);
-	EMISSION = faction_color.rgb * rim * spiral * 0.18;
-	ALPHA = 1.0 - smoothstep(0.965, 1.0, radius);
+	float inner_wall = smoothstep(0.42, 0.84, radius);
+	float rim = smoothstep(0.76, 0.91, radius);
+	float hot_edge = smoothstep(0.91, 0.965, radius) * (1.0 - smoothstep(0.975, 1.0, radius));
+	float shimmer = 0.92 + 0.08 * sin(angle * 5.0 + time * 1.4);
+	vec3 core = mix(vec3(0.001, 0.002, 0.006), faction_color.rgb * 0.085, inner_wall);
+	vec3 edge = faction_color.rgb * (0.72 + hot_edge * 0.85) * shimmer;
+	ALBEDO = mix(core, edge, rim);
+	EMISSION = faction_color.rgb * (rim * 0.20 + hot_edge * 0.45);
+	ALPHA = 1.0 - smoothstep(0.985, 1.0, radius);
 }

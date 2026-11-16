@@ -42,4 +42,8 @@ func run() -> void:
 	expect(rig.zoom == before, "投影不改变成长状态")
 	expect(rig.set_projection("perspective") and rig.perspective_camera.current, "默认透视可恢复")
 	expect(not rig.set_projection("invalid"), "拒绝未知投影")
+	var logical_position := rig.position
+	rig.add_shake(0.12)
+	rig.step(0.05, logical_position, 0.38)
+	expect(rig.position == logical_position and rig.shake_offset.length() > 0.0, "镜头震动只偏移相机不修改逻辑跟随位置")
 	rig.free()

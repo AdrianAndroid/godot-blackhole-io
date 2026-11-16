@@ -25,6 +25,8 @@ func setup_route(stable_id: int, radius_value: float, color: Color, route_value:
 func step_route(delta: float) -> void:
 	if state != State.IDLE or route.size() < 2:
 		return
+	if actor.visual != null:
+		actor.visual.step(delta)
 	var target := route[waypoint]
 	position = position.move_toward(target, route_speed * delta)
 	position.y = 0.0

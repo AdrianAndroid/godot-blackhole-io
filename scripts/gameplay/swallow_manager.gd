@@ -1,6 +1,7 @@
 class_name SwallowManager
 extends Node
 
+signal claimed(object: Swallowable, hole: HoleActor)
 signal completed(event: Dictionary)
 signal cancelled(object_id: int)
 
@@ -29,6 +30,7 @@ func try_claim(object: Swallowable, hole: HoleActor) -> bool:
 		return false
 	transactions[object.object_id] = {"object": object, "hole": hole}
 	object.begin_sinking()
+	claimed.emit(object, hole)
 	return true
 
 

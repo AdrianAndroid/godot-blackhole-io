@@ -124,6 +124,11 @@ func advance(delta: float, hole_position: Vector3) -> bool:
 	var eased := smoothstep(0.0, 1.0, progress)
 	position.x = lerpf(_origin.x, hole_position.x, eased)
 	position.z = lerpf(_origin.z, hole_position.z, eased)
+	var travel := Vector2(hole_position.x - _origin.x, hole_position.z - _origin.z)
+	var perpendicular := Vector2(-travel.y, travel.x).normalized()
+	var arc := perpendicular * sin(progress * PI) * minf(0.65, travel.length() * 0.18)
+	position.x += arc.x
+	position.z += arc.y
 	position.y = _origin.y - eased * maxf(1.2, footprint_radius * 1.5)
 	rotation = _initial_rotation + Vector3(eased * 0.35, eased * 0.4, eased * 0.65)
 	scale = _initial_scale * maxf(0.02, 1.0 - eased * 0.9)

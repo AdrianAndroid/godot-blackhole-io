@@ -44,6 +44,8 @@ func build() -> void:
 func step(delta: float, direction: Vector2) -> void:
 	if not alive:
 		return
+	if visual != null:
+		visual.step(delta)
 	var motion := Vector3(direction.x, 0, direction.y) * move_speed * delta
 	var next := position + motion
 	var limit := map_size * 0.5 - Vector2.ONE * effective_radius

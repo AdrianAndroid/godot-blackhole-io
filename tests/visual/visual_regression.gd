@@ -109,7 +109,10 @@ func _prepare_checkpoint(checkpoint: String, session: GameSession) -> void:
 			session.opponents[0].position = session.player.position
 			session.opponents[1].position = session.player.position
 			session.step(0.01)
-			session.step(1.0)
+			for tick in 100:
+				session.step(0.01)
+				if session.opponents[0].state == Swallowable.State.SETTLED and session.opponents[1].state == Swallowable.State.SETTLED:
+					break
 		"tower":
 			_unlock(session)
 			session.player.position = session.tower.position + Vector3(0, 0, 8)

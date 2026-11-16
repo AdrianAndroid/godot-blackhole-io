@@ -10,6 +10,9 @@ var base_orthographic_size: float = 24.0
 var zoom: float = 1.0
 var smoothing: float = 10.0
 var initialized: bool = false
+var shake_strength: float = 0.0
+var visual_time: float = 0.0
+var shake_offset := Vector3.ZERO
 
 
 func _ready() -> void:
@@ -52,13 +55,20 @@ func step(delta: float, target_position: Vector3, radius: float) -> void:
 	var half := map_size * 0.5
 	position.x = clampf(position.x, -half.x + margin.x, half.x - margin.x)
 	position.z = clampf(position.z, -half.y + margin.y, half.y - margin.y)
+	visual_time += delta
+	shake_strength = move_toward(shake_strength, 0.0, delta * 0.65)
+	shake_offset = Vector3(sin(visual_time * 71.0), cos(visual_time * 83.0) * 0.35, cos(visual_time * 59.0)) * shake_strength
 	_update_camera_transform()
+
+
+func add_shake(strength: float) -> void:
+	shake_strength = maxf(shake_strength, clampf(strength, 0.0, 0.24))
 
 
 func _update_camera_transform() -> void:
 	if perspective_camera == null:
 		return
-	var offset := base_offset * zoom
+	var offset := base_offset * zoom + shake_offset
 	perspective_camera.position = offset
 	orthographic_camera.position = offset
 	orthographic_camera.size = base_orthographic_size * zoom

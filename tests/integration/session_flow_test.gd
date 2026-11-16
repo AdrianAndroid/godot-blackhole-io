@@ -68,6 +68,32 @@ func run() -> void:
 	expect(not all_text.contains("商店") and not all_text.contains("广告"), "没有商店或广告占位入口")
 	hud_session.free()
 
+	var feedback := _session(9005)
+	feedback.driver_enabled = true
+	var target_object: Swallowable
+	for object in feedback.spawn_manager.objects.values():
+		if object.footprint_radius < feedback.player.effective_radius:
+			target_object = object
+			break
+	feedback.player.position = target_object.position
+	feedback.step(0.01)
+	expect(feedback.attraction_bursts.size() == 1 and feedback.player.visual.feedback_pulse > 0.0, "真实认领触发吸附轨迹和洞口脉冲")
+	expect(feedback.hud.floating_entries.is_empty() and feedback.objective.current_score == 0, "认领阶段不提前弹奖励")
+	for tick in 60:
+		feedback.step(0.01)
+		if target_object.state == Swallowable.State.SETTLED:
+			break
+	expect(target_object.state == Swallowable.State.SETTLED and not feedback.hud.floating_entries.is_empty(), "完全结算后触发奖励飘字")
+	expect(feedback.camera_rig.shake_strength > 0.0, "真实结算触发轻微镜头震动")
+	var snapshot_before_projection := str(feedback.snapshot())
+	feedback.camera_rig.add_shake(0.2)
+	feedback.camera_rig.step(0.02, feedback.player.position, feedback.player.effective_radius)
+	expect(str(feedback.snapshot()) == snapshot_before_projection, "镜头震动不进入玩法逻辑快照")
+	for tick in 110:
+		feedback.hud.step(0.01)
+	expect(feedback.hud.floating_entries.is_empty(), "飘字固定步进结束后清理节点")
+	feedback.free()
+
 	var unready := GameSession.new()
 	expect(unready.state == GameSession.State.READY, "Session 创建为 READY")
 	unready.free()

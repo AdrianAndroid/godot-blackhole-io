@@ -9,7 +9,7 @@
 ## 工程基线
 
 - Godot：4.7.2，路径 `/usr/local/bin/godot`。
-- 渲染：Mobile，实时 3D；432×960，固定 9:20 竖屏比例。
+- 渲染：OpenGL Compatibility，实时 3D；432×960，固定 9:20 竖屏比例。
 - 逻辑：GDScript，XZ 地面平面；不采用刚体驱动物体吞噬。
 - 操作：鼠标左键或单指拖动浮动摇杆；Esc 暂停/继续，C 切换投影，M 静音。
 - 测试：项目内 GDScript 固定步进入口，不要求用户手工参与。
@@ -55,7 +55,7 @@ python3 tools/acceptance.py --verify-failure-exit
 
 最后一条是故意失败自检，预期退出码 1；报告必须包含 `intentional_failure`。测试发现按文件名排序，编译失败、实例创建失败、零断言和空测试集都不能视为通过。`--skip=soak` 可在开发时拆分长 soak 组；正式完整验收不会跳过。
 
-自动整局只通过 `AutoDriver` 选择输入并调用真实 `GameSession.step`。覆盖高塔胜利、追逐大型对手被吞、自然 600 秒超时，以及暂停、鼠标/触摸、双投影和多重击倒组合。详细 20 局结果见 `artifacts/soak_matches.json`。
+自动整局只通过 `AutoDriver` 选择输入并调用真实 `GameSession.step`。覆盖终点塔胜利、追逐大型对手被吞、自然 600 秒超时，以及暂停、鼠标/触摸、双投影和多重击倒组合。详细 20 局结果见 `artifacts/soak_matches.json`。
 
 ## 输入与镜头调试
 
@@ -75,7 +75,7 @@ python3 tools/acceptance.py --verify-failure-exit
 /usr/local/bin/godot --path . --script res://tests/visual/city_sample_test.gd
 ```
 
-12 个检查点为首页、初始、成长、下沉中、满级、二重击倒、高塔、胜利、失败、地图边缘输入、不可吞建筑遮挡和水面黑洞。每个检查点分别保存透视和正交，共 24 张基线。固定种子为 `20261115`，黑洞 Shader 固定动画时刻为 `2.0`；不得用 headless 截图替代。
+12 个检查点为首页、初始、成长、下沉中、满级、二重击倒、终点塔、胜利、失败、地图边缘输入、不可吞建筑遮挡和水面黑洞。每个检查点分别保存透视和正交，共 24 张基线。固定种子为 `20261115`，黑洞与终点塔固定动画时刻为 `2.0`；不得用 headless 截图替代。
 
 每通道容差为 `0.04`，允许变化像素比例为 `1%`。截图前最多读取 16 个真实渲染帧，必须出现两张完整像素数据一致的连续帧，避免把消失物体的瞬时旧阴影录成基线；无法在上限内稳定也判失败。报告中的 `rendered_frames` 记录实际等待帧数。普通模式缺基线、缺检查点、超容差、投影前后逻辑快照变化、基线 SHA-256 被改写或 HUD 越界均失败。
 
@@ -92,7 +92,7 @@ python3 tools/acceptance.py --verify-failure-exit
 
 完整回归更新会保留每个标签的 `_before.png`、`_after.png` 和 `artifacts/visual/baseline_updates/report.json`。更新后必须再运行不带参数的普通比较。
 
-本机 Intel UHD 630 / MoltenVK 会输出部分 Vulkan compute pipeline 初始化错误日志，但 Mobile 真实图像能生成，当前普通像素比较通过。该驱动边界会保留在验收汇总中，不描述为“完全无渲染警告”。
+当前 Mac 使用 OpenGL Compatibility，避开 Intel UHD 630 / MoltenVK 的 compute pipeline 初始化错误。真实渲染日志仍完整保留；资源加载提示等警告不会被描述为不存在。
 
 ## 故障保存与重放
 

@@ -139,7 +139,10 @@ def audit() -> dict:
         failures.append(f"模型注册数量不是 40: {len(models)}")
     for model in models:
         resource = str(model.get("path", "")).removeprefix("res://")
-        if not resource or not (ROOT / resource).is_file():
+        if resource.startswith("procedural://"):
+            if resource != "procedural://duck":
+                failures.append(f"未知程序化模型资源: {resource}")
+        elif not resource or not (ROOT / resource).is_file():
             failures.append(f"注册模型资源缺失: {resource}")
     for checkpoint in CHECKPOINTS:
         for projection in ("perspective", "orthographic"):
@@ -197,7 +200,7 @@ def write_summary(groups: list[dict], audit_report: dict, require_clean: bool) -
             "Mac 原型验收不证明未来抖音小游戏兼容性。",
             "像素回归验证预设视觉不变量，不证明主观美术与视频完全一致。",
             "音效测试验证资源与事件，不替代主观听感评审。",
-            "Intel UHD 630 / MoltenVK 仍输出 compute pipeline 驱动日志；真实图像已成功生成并比较。",
+            "当前 Mac 使用 OpenGL Compatibility，避开 Intel UHD 630 / MoltenVK 的 compute pipeline 驱动错误；真实图像已成功生成并比较。",
         ],
     }
     (ACCEPTANCE / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")

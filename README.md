@@ -10,7 +10,15 @@ Godot 4.7.2 + GDScript 的实时 3D 黑洞吞噬单局原型。包含随机城�
 
 以上均为真实 Godot 渲染的 432×960 竖屏截图。
 
-## 运行
+## 在线 Web 演示
+
+**[打开 GitHub Pages 演示](https://adrianandroid.github.io/godot-blackhole-io/)** · [单独打开游戏画面](https://adrianandroid.github.io/godot-blackhole-io/play.html)
+
+- **Mac 桌面端是主开发与验收环境**：功能开发、完整对局、故障重放、真实视觉回归和性能采样均以 Mac 结果为准。
+- **GitHub Pages 是独立衍生的 Web 演示**：由 GitHub Actions 从同一源码导出，不替代 Mac 验收，也不改变桌面端玩法规则。
+- 浏览器需要支持 WebGL 2；首次打开需要下载约 52 MB 的 WASM 与游戏资源。网页性能和渲染效果取决于浏览器与设备。
+
+## Mac 桌面端运行（主开发）
 
 ```bash
 /usr/local/bin/godot --path .
@@ -48,8 +56,11 @@ python3 tools/acceptance.py
 - `assets/game/`：正式使用且授权可追溯的资源。
 - `assets/candidates/`：原始候选包；解压目录不进入 Git，也不由 Godot 导入。
 - `tests/`：逻辑、整局、故障、性能与图形自动测试。
-- `tools/acceptance.py`：统一验收入口。
-- `artifacts/`：本地自动验收输出，不进入 Git。
+- `tools/acceptance.py`：Mac 统一验收入口；`tools/web_smoke.py` 为真实 Chrome Web 冒烟测试。
+- `export_presets.cfg`：无多线程 Web 导出预设。
+- `web/index.html`：Pages 介绍页；实际 Godot 页面为 `play.html`。
+- `.github/workflows/pages.yml`：Web 构建和 Pages 自动部署。
+- `artifacts/`：本地自动验收输出，不进入 Git；`build/` 为本地导出目录，同样不提交。
 - `openspec/changes/add-video-referenced-mvp/`：本轮需求、设计和任务。
 
 ## 验证边界

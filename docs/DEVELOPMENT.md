@@ -2,7 +2,7 @@
 
 ## 阶段提交
 
-本项目只使用本地 Git，不配置远程仓库。每个实现阶段在自动检查通过后提交；提交只包含该阶段已验证的源码、正式资源、测试和文档。
+每个实现阶段在自动检查通过后创建 `feat: <阶段名>` 或对应修复提交，并推送到 `AdrianAndroid/godot-blackhole-io`；提交只包含该阶段已验证的源码、正式资源、测试和文档。
 
 原始候选 ZIP、预览和授权清单入库；`assets/candidates/*/extracted/`、参考视频、`.godot/` 与 `artifacts/` 保持本地，不提交。不得通过覆盖原始素材修复正式资源。
 
@@ -118,6 +118,47 @@ python3 tools/acceptance.py --verify-failure-exit
 - `artifacts/performance/high_density.png`
 
 样本数和报告完整性是通过条件，帧率数值不是通过门槛。
+
+## GitHub Pages Web 演示
+
+### 层次与边界
+
+- **Mac 桌面端是主开发环境**：逻辑、100 种子、完整对局、soak、故障重放、24 张真实视觉回归和性能采样仍在 Mac 执行。
+- **GitHub Pages 是衍生演示环境**：同一源码的无多线程 Web 导出，只用于浏览器体验，不替代上述 Mac 验收。
+- Web 需要支持 WebGL 2 的现代浏览器。浏览器效果、加载时间与性能不属于 Mac 像素基线，也不证明未来抖音小游戏兼容性。
+- `variant/thread_support=false`，因此不依赖 GitHub Pages 无法自定义的 COOP/COEP 响应头。
+
+### 本地导出与浏览器验证
+
+```bash
+/usr/local/bin/godot --headless --path . --editor --quit
+/usr/local/bin/godot --headless --path . --export-release "Web / GitHub Pages" build/web/play.html
+cp web/index.html build/web/index.html
+touch build/web/.nojekyll
+python3 -I -m http.server 8765 --bind 127.0.0.1 --directory build/web
+```
+
+不能用 `file://` 判断 Web 导出是否可用。服务启动后，在另一个终端运行真实 Chrome 冒烟测试：
+
+```bash
+python3 -I tools/web_smoke.py --url http://127.0.0.1:8765/ --output artifacts/web/local
+python3 -I tools/web_smoke.py --url http://127.0.0.1:8765/play.html --output artifacts/web/direct
+```
+
+测试依赖 Playwright、Pillow 和本机 Chrome；可加 `--headless`。它检查无多线程配置、WASM/PCK/JavaScript 请求、console/page error、canvas 非空渲染，并实际点击开始、拖动、切换投影、暂停和静音。首页 iframe 与直接打开 `play.html` 分别验证，截图及 JSON 报告只写入 `artifacts/web/`。
+
+`build/web/` 是导出产物，不进入 Git。当前首次加载约为 38 MB WASM + 14 MB PCK。
+
+### 自动部署
+
+`.github/workflows/pages.yml` 在 `main` 推送或手动触发时运行：下载指定版本的官方 Godot Linux 引擎与导出模板、导入资源、导出 Web、复制介绍页并部署到 GitHub Pages。仓库 Pages 的部署来源必须选择 **GitHub Actions**，不是从分支发布静态文件。
+
+公开地址：
+
+- 介绍与嵌入演示：`https://adrianandroid.github.io/godot-blackhole-io/`
+- 独立游戏画面：`https://adrianandroid.github.io/godot-blackhole-io/play.html`
+
+部署后可用同一个 `tools/web_smoke.py` 指向上述公网地址复验。Pages 工作流成功不等于 Mac 完整验收已通过，两类证据分别保留。
 
 ## 验证边界
 

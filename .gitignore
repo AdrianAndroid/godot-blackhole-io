@@ -7,6 +7,10 @@
 # Automated verification output
 artifacts/
 
+# Local Web exports and CI tool downloads
+build/
+.godot-ci/
+
 # Untrusted candidate archives remain available locally without duplicating extraction in Git
 assets/candidates/*/extracted/
 

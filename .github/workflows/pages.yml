@@ -1,0 +1,91 @@
+name: Deploy Web demo to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: 4.7.2
+  GODOT_RELEASE: 4.7.2-stable
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Godot engine and Web templates
+        uses: actions/cache@v4
+        with:
+          path: |
+            .godot-ci/engine
+            .godot-ci/templates
+          key: godot-${{ runner.os }}-${{ env.GODOT_VERSION }}-web-v1
+
+      - name: Prepare Godot and non-threaded Web templates
+        shell: bash
+        run: |
+          set -euo pipefail
+          engine="$PWD/.godot-ci/engine/Godot_v${GODOT_RELEASE}_linux.x86_64"
+          if [[ ! -x "$engine" ]]; then
+            mkdir -p .godot-ci/downloads/engine .godot-ci/engine
+            curl -fL --retry 3 -o .godot-ci/downloads/engine/godot.zip \
+              "https://github.com/godotengine/godot/releases/download/${GODOT_RELEASE}/Godot_v${GODOT_RELEASE}_linux.x86_64.zip"
+            unzip -q .godot-ci/downloads/engine/godot.zip -d .godot-ci/engine
+            chmod +x "$engine"
+          fi
+          if [[ ! -f .godot-ci/templates/web_nothreads_release.zip ]]; then
+            mkdir -p .godot-ci/downloads/templates .godot-ci/templates-unpacked .godot-ci/templates
+            curl -fL --retry 3 -o .godot-ci/downloads/templates/templates.tpz \
+              "https://github.com/godotengine/godot/releases/download/${GODOT_RELEASE}/Godot_v${GODOT_RELEASE}_export_templates.tpz"
+            unzip -q .godot-ci/downloads/templates/templates.tpz -d .godot-ci/templates-unpacked
+            cp .godot-ci/templates-unpacked/templates/web_*.zip .godot-ci/templates/
+            cp .godot-ci/templates-unpacked/templates/version.txt .godot-ci/templates/
+          fi
+          template_home="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          mkdir -p "$template_home"
+          cp .godot-ci/templates/*.zip .godot-ci/templates/version.txt "$template_home/"
+          "$engine" --version
+
+      - name: Import project resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          engine="$PWD/.godot-ci/engine/Godot_v${GODOT_RELEASE}_linux.x86_64"
+          "$engine" --headless --path "$GITHUB_WORKSPACE" --editor --quit
+
+      - name: Export the Web demo
+        shell: bash
+        run: |
+          set -euo pipefail
+          engine="$PWD/.godot-ci/engine/Godot_v${GODOT_RELEASE}_linux.x86_64"
+          "$engine" --headless --path "$GITHUB_WORKSPACE" --export-release "Web / GitHub Pages" build/web/play.html
+          cp web/index.html build/web/index.html
+          touch build/web/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

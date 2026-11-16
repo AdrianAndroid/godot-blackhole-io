@@ -8,7 +8,7 @@ func _ready() -> void:
 	name = "HomeScreen"
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var theme := Theme.new()
-	theme.default_font = load("res://assets/game/fonts/NotoSansSC-Variable.ttf")
+	theme.default_font = load("res://assets/game/fonts/NotoSansSC-Game.ttf")
 	theme.default_font_size = 18
 	self.theme = theme
 	var background := ColorRect.new()

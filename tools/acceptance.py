@@ -19,6 +19,7 @@ ACCEPTANCE = ARTIFACTS / "acceptance"
 
 EXPECTED_HASHES = {
     "assets/game/fonts/NotoSansSC-Variable.ttf": "a3041811a78c361b1de50f953c805e0244951c21c5bd412f7232ef0d899af0da",
+    "assets/game/fonts/NotoSansSC-Game.ttf": "62de04e925cec37d6955d5298f86a79ce37748209932de819891b40e41da51da",
     "assets/game/fonts/OFL.txt": "1c05c68c34f9708415aada51f17e1b0092d2cea709bf4a94cd38114f9e73d7d9",
     "assets/game/audio/devour.ogg": "f74c1334c0c1ab9ec69f3dd723611a8eb89a2630df6c3760dee3b09413370c83",
     "assets/game/audio/level_up.ogg": "1a4c90fed704b4f4b36d58f481117cfac5cdc25279a9af97d4765b71ff21ed48",
@@ -119,6 +120,16 @@ def audit() -> dict:
             failures.append(f"资源缺失或 SHA-256 改变: {relative}")
         else:
             checked_hashes += 1
+    subset_check = subprocess.run(
+        [sys.executable, "-I", str(ROOT / "tools/subset_font.py"), "--check"],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        timeout=60,
+    )
+    if subset_check.returncode != 0:
+        failures.append("字体子集未更新或缺少字符: " + subset_check.stdout.strip())
     licenses = [
         "assets/game/models/commercial/License.txt",
         "assets/game/models/suburban/License.txt",

@@ -16,7 +16,7 @@ Godot 4.7.2 + GDScript 的实时 3D 黑洞吞噬单局原型。包含随机城�
 
 - **Mac 桌面端是主开发与验收环境**：功能开发、完整对局、故障重放、真实视觉回归和性能采样均以 Mac 结果为准。
 - **GitHub Pages 是独立衍生的 Web 演示**：由 GitHub Actions 从同一源码导出，不替代 Mac 验收，也不改变桌面端玩法规则。
-- 浏览器需要支持 WebGL 2；首次打开需要下载约 52 MB 的 WASM 与游戏资源。网页性能和渲染效果取决于浏览器与设备。
+- 浏览器需要支持 WebGL 2；首次打开的核心 WASM、PCK 与 JavaScript 原始约 41.2 MB，gzip 后约 11.5 MB（以服务端压缩为准）。中文字体子集保留全部运行字符和可变字重，不降低画质。网页性能和渲染效果取决于浏览器与设备。
 
 ## Mac 桌面端运行（主开发）
 
@@ -34,7 +34,7 @@ Godot 4.7.2 + GDScript 的实时 3D 黑洞吞噬单局原型。包含随机城�
 ## 完整自动验收
 
 ```bash
-python3 tools/acceptance.py
+python3 -I tools/acceptance.py
 ```
 
 无需手工试玩。入口串联逻辑与 100 种子、完整胜负对局、20 局 soak、双投影真实截图、故障重放、性能采样和素材授权审计。任一必需组失败返回非零。
@@ -56,7 +56,7 @@ python3 tools/acceptance.py
 - `assets/game/`：正式使用且授权可追溯的资源。
 - `assets/candidates/`：原始候选包；解压目录不进入 Git，也不由 Godot 导入。
 - `tests/`：逻辑、整局、故障、性能与图形自动测试。
-- `tools/acceptance.py`：Mac 统一验收入口；`tools/web_smoke.py` 为真实 Chrome Web 冒烟测试。
+- `tools/acceptance.py`：Mac 统一验收入口；`tools/web_smoke.py` 为真实 Chrome Web 冒烟测试；`tools/subset_font.py` 可复现生成并校验运行字体子集。
 - `export_presets.cfg`：无多线程 Web 导出预设。
 - `web/index.html`：Pages 介绍页；实际 Godot 页面为 `play.html`。
 - `.github/workflows/pages.yml`：Web 构建及独立 `gh-pages` 分支自动发布。

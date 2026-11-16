@@ -66,12 +66,25 @@ def main():
         page.on("response", lambda response: report["responses"].append({"url": response.url, "status": response.status}))
 
         try:
+            navigation_started = time.monotonic()
             response = page.goto(args.url, wait_until="domcontentloaded", timeout=args.timeout_ms)
             report["checks"]["document_http_200"] = response is not None and response.status == 200
             frame = page.main_frame if direct else page.locator("iframe").element_handle().content_frame()
             canvas = frame.locator("#canvas")
             canvas.wait_for(state="visible", timeout=args.timeout_ms)
             frame.locator("#status").wait_for(state="detached", timeout=args.timeout_ms)
+            report["startup_seconds"] = round(time.monotonic() - navigation_started, 3)
+            report["engine_ready_ms"] = round(frame.evaluate("performance.now()"), 3)
+            report["resources"] = frame.evaluate("""
+                performance.getEntriesByType('resource').map(entry => ({
+                    name: entry.name,
+                    duration_ms: Math.round(entry.duration),
+                    transfer_bytes: entry.transferSize,
+                    encoded_bytes: entry.encodedBodySize,
+                    decoded_bytes: entry.decodedBodySize,
+                    initiator: entry.initiatorType,
+                }))
+            """)
             page.wait_for_timeout(3000)
 
             report["checks"]["non_threaded_export"] = frame.evaluate("GODOT_THREADS_ENABLED") is False

@@ -18,7 +18,7 @@
 ## 一键完整验收
 
 ```bash
-python3 tools/acceptance.py
+python3 -I tools/acceptance.py
 ```
 
 入口依次运行编辑器导入、全部逻辑（含 100 个固定种子）、预期失败自检、20 局混合结局 soak、12 检查点双投影真实截图、城市投影/分区、真实故障截图及独立重放、性能采样和素材审计。任一必需组失败均返回非零。
@@ -32,13 +32,13 @@ python3 tools/acceptance.py
 干净提交验收使用：
 
 ```bash
-python3 tools/acceptance.py --require-clean
+python3 -I tools/acceptance.py --require-clean
 ```
 
 验证汇总器自身能把必需组失败转换为退出码 1：
 
 ```bash
-python3 tools/acceptance.py --verify-failure-exit
+python3 -I tools/acceptance.py --verify-failure-exit
 # 预期命令退出码为 1，并生成 passed=false 的汇总。
 ```
 
@@ -128,10 +128,32 @@ python3 tools/acceptance.py --verify-failure-exit
 - Web 需要支持 WebGL 2 的现代浏览器。浏览器效果、加载时间与性能不属于 Mac 像素基线，也不证明未来抖音小游戏兼容性。
 - `variant/thread_support=false`，因此不依赖 GitHub Pages 无法自定义的 COOP/COEP 响应头。
 
+### 字体子集与启动测量
+
+运行界面加载 `assets/game/fonts/NotoSansSC-Game.ttf`，原始完整字体只用于来源审计和再生成，不进入 Web PCK。子集保留 296 个运行字符、完整可打印 ASCII 和 `wght` 可变字重；没有删减 UI 文案或降低模型、纹理质量。
+
+```bash
+# 字符来源变化后重新生成；正常开发只校验已提交子集
+python3 -I tools/subset_font.py
+python3 -I tools/subset_font.py --check
+```
+
+生成器读取 `scripts/**/*.gd` 和字体覆盖测试，使用 fontTools 4.51.0；完整素材审计会重新生成到内存并逐字节比较，防止新增动态文案后漏更新。授权、大小与 SHA-256 见 `assets/game/ASSETS.md`。
+
+本地 Web 原始文件对比：
+
+| 资源 | 优化前 | 优化后 |
+| --- | ---: | ---: |
+| `play.pck` | 14,585,320 字节 | 1,441,568 字节 |
+| WASM + PCK + JavaScript | 54,379,889 字节 | 41,236,137 字节 |
+
+`tools/web_smoke.py` 的 `startup_seconds` 记录外部导航到 Godot `#status` 消失，`engine_ready_ms` 记录游戏页面自身的 `performance.now()`；`resources` 保存 Resource Timing 的传输量、解码体积、耗时与发起类型。`elapsed_seconds` 还包含固定等待、点击和移动，不能当作纯启动时间。公网优化前后使用同一脚本和新的浏览器上下文测量，报告分别保存在 `artifacts/web/startup-before/` 与最终复验目录。
+
 ### 本地导出与浏览器验证
 
 ```bash
 /usr/local/bin/godot --headless --path . --editor --quit
+python3 -I tools/subset_font.py --check
 mkdir -p build/web
 /usr/local/bin/godot --headless --path . --export-release "Web / GitHub Pages" build/web/play.html
 cp web/index.html build/web/index.html
@@ -148,7 +170,7 @@ python3 -I tools/web_smoke.py --url http://127.0.0.1:8765/play.html --output art
 
 测试依赖 Playwright、Pillow 和本机 Chrome；可加 `--headless`。它检查无多线程配置、WASM/PCK/JavaScript 请求、console/page error、canvas 非空渲染，并实际点击开始、拖动、切换投影、暂停和静音。首页 iframe 与直接打开 `play.html` 分别验证，截图及 JSON 报告只写入 `artifacts/web/`。
 
-`build/web/` 是导出产物，不进入 Git。当前首次加载约为 38 MB WASM + 14 MB PCK。
+`build/web/` 是导出产物，不进入 Git。当前原始文件约为 38 MiB WASM + 1.4 MiB PCK；GitHub Pages 会提供 gzip，真实传输量以浏览器 Resource Timing 为准。
 
 ### 自动部署
 

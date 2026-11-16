@@ -5,13 +5,20 @@ func run() -> void:
 	for cue in AudioManager.CUES:
 		var stream: AudioStream = load(AudioManager.CUES[cue])
 		expect(stream != null and stream.get_length() > 0.0, "音效资源有效: " + cue)
-	var font: Font = load("res://assets/game/fonts/NotoSansSC-Variable.ttf")
+	var font: Font = load("res://assets/game/fonts/NotoSansSC-Game.ttf")
 	var chinese := "黑洞城市第关适中开始对局拖动摇杆移动吞噬完成目标体型金币击倒连击最大金色高塔已出现东南北胜利本失败重试同一张返回新暂停继续时间终点解锁度下沉抵达"
 	var missing: Array[int] = []
 	for index in chinese.length():
 		if not font.has_char(chinese.unicode_at(index)):
 			missing.append(chinese.unicode_at(index))
 	expect(missing.is_empty(), "首页 HUD 满级连击和结算中文字形完整")
+	var missing_ascii: Array[int] = []
+	for codepoint in range(32, 127):
+		if not font.has_char(codepoint):
+			missing_ascii.append(codepoint)
+	expect(missing_ascii.is_empty(), "动态数字时间百分比和 ASCII 标点字形完整")
+	var wght_tag := TextServerManager.get_primary_interface().name_to_tag("wght")
+	expect(font.get_supported_variation_list().has(wght_tag), "运行字体保留可变 wght 字重轴")
 
 	var session := GameSession.new()
 	session.seed_value = 6060

@@ -38,7 +38,7 @@ func build() -> void:
 	add_child(root_control)
 	var theme := Theme.new()
 	var font := FontVariation.new()
-	font.base_font = load("res://assets/game/fonts/NotoSansSC-Variable.ttf")
+	font.base_font = load("res://assets/game/fonts/NotoSansSC-Game.ttf")
 	font.variation_opentype = {"wght": 650.0}
 	font.variation_embolden = 0.25
 	theme.default_font = font

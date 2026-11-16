@@ -16,6 +16,16 @@
 - **授权**：SIL Open Font License 1.1；版权行和保留字体名见随附的 `fonts/OFL.txt`。允许随软件再分发，但不得单独销售字体，且再分发时必须保留版权与授权文本。
 - **完整性**：17,772,300 字节，与上述固定提交的 GitHub API 元数据一致；SHA-256：`a3041811a78c361b1de50f953c805e0244951c21c5bd412f7232ef0d899af0da`。
 
+### `fonts/NotoSansSC-Game.ttf`
+
+- **用途**：首页、HUD、动态数字与结算实际加载的运行字体；替代完整字体进入游戏和 Web 导出，但不替代上方保留的原始来源文件。
+- **生成方式**：使用 fontTools 4.51.0 对 `NotoSansSC-Variable.ttf` 子集化；保留可变 `wght` 轴、原有轮廓、字重变化及必要 OpenType 布局信息。
+- **字符来源**：`scripts/` 下全部 GDScript 文案、`tests/integration/audio_font_test.gd` 的覆盖契约，以及完整可打印 ASCII。当前包含 296 个字符，动态时间、分数、百分比和标点均覆盖。
+- **复现与防缺字**：运行 `python3 -I tools/subset_font.py` 重新生成；`python3 -I tools/subset_font.py --check` 确定性重建并比较当前文件，运行文案变化而子集未更新时完整验收会失败。
+- **体积与完整性**：209,576 字节；SHA-256：`62de04e925cec37d6955d5298f86a79ce37748209932de819891b40e41da51da`。
+- **原始文件保护**：原始 17,772,300 字节字体及其 SHA-256 保持不变，用于来源审计和重新生成；Web 导出显式排除原始完整字体，避免 `all_resources` 再次打包。
+- **授权**：属于上述 Noto Sans SC 的 SIL OFL 1.1 衍生字体，继续随附完整 `fonts/OFL.txt`，保留原版权及名称信息。
+
 ### `fonts/OFL.txt`
 
 - **来源**：同一官方仓库、同一固定提交的 [`ofl/notosanssc/OFL.txt`](https://github.com/google/fonts/blob/cc39c4c2c304bc368c9b7c311ea2bcc6013299fe/ofl/notosanssc/OFL.txt)。

@@ -3,6 +3,8 @@ extends Node3D
 
 var registry := ModelRegistry.new()
 var objects: Dictionary = {}
+var dynamic_objects: Array[Swallowable] = []
+var tower_object: Swallowable
 var roads_root: Node3D
 var objects_root: Node3D
 var water_surface: MeshInstance3D
@@ -14,16 +16,11 @@ func build(layout: CityGenerator.Layout) -> void:
 	CityVisuals.add_lighting(self)
 	CityVisuals.add_ground(self, layout.map_size)
 	CityVisuals.add_ground_details(self)
-	water_surface = CityVisuals.add_water(self, Vector2(34, 0), Vector2(12, 80))
+	water_surface = CityVisuals.add_water(self, CityGenerator.WATER_CENTER, CityGenerator.WATER_SIZE)
 	roads_root = Node3D.new()
 	roads_root.name = "Roads"
 	add_child(roads_root)
-	for road in layout.roads:
-		var model := registry.instantiate(road.model_id)
-		model.position += road.position
-		model.rotation_degrees.y += float(road.rotation_y)
-		CityVisuals.style_road(model)
-		roads_root.add_child(model)
+	CityVisuals.add_roads(roads_root, layout.roads, registry)
 	objects_root = Node3D.new()
 	objects_root.name = "Objects"
 	add_child(objects_root)
@@ -36,7 +33,8 @@ func build(layout: CityGenerator.Layout) -> void:
 		object.position = placement.position
 		object.rotation_degrees.y = float(placement.rotation_y)
 		if placement.has("route"):
-			object.configure_route(placement.route, float(placement.route_speed))
+			object.configure_route(placement.route, float(placement.route_speed), float(placement.get("route_phase", 0.0)))
+			dynamic_objects.append(object)
 		object.capture_transform()
 		objects_root.add_child(object)
 		objects[object.object_id] = object
@@ -49,9 +47,8 @@ func advance_visuals(delta: float, hole_position: Vector3, hole_radius: float) -
 		var material := water_surface.material_override as ShaderMaterial
 		material.set_shader_parameter("wave_time", wave_time)
 	occlusion_fader.step(delta, hole_position, hole_radius)
-	for object in objects.values():
-		if is_instance_valid(object) and object.model_root is TowerVisual and object.state != Swallowable.State.SETTLED:
-			(object.model_root as TowerVisual).step(delta)
+	if is_instance_valid(tower_object) and tower_object.state != Swallowable.State.SETTLED:
+		(tower_object.model_root as TowerVisual).step(delta)
 
 
 func spawn_tower(position_value: Vector3) -> Swallowable:
@@ -66,4 +63,14 @@ func spawn_tower(position_value: Vector3) -> Swallowable:
 	tower.capture_transform()
 	add_child(tower)
 	objects[tower.object_id] = tower
+	tower_object = tower
 	return tower
+
+
+func retire_normal(object_id: int) -> void:
+	var object: Swallowable = objects.get(object_id)
+	if object == null:
+		return
+	objects.erase(object_id)
+	occlusion_fader.unregister(object)
+	object.release_visual()

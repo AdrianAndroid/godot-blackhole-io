@@ -3,10 +3,15 @@ extends Node3D
 
 var effective_radius: float = 0.38:
 	set(value):
-		effective_radius = value
+		var next := maxf(value, 0.01)
+		if is_equal_approx(effective_radius, next):
+			return
+		effective_radius = next
+		radius_revision += 1
 		if visual != null:
-			visual.effective_radius = value
+			visual.effective_radius = next
 		_update_area_radius()
+var radius_revision: int = 0
 var move_speed: float = 5.2
 var map_size := Vector2(96, 96)
 var faction_color := Color("3298ff"):
@@ -44,8 +49,6 @@ func build() -> void:
 func step(delta: float, direction: Vector2) -> void:
 	if not alive:
 		return
-	if visual != null:
-		visual.step(delta)
 	var motion := Vector3(direction.x, 0, direction.y) * move_speed * delta
 	var next := position + motion
 	var limit := map_size * 0.5 - Vector2.ONE * effective_radius

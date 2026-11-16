@@ -5,8 +5,12 @@ const PARTICLE_COUNT := 12
 
 var effective_radius: float = 0.38:
 	set(value):
-		effective_radius = maxf(value, 0.01)
+		var next := maxf(value, 0.01)
+		if is_equal_approx(effective_radius, next):
+			return
+		effective_radius = next
 		_update_size()
+var size_revision: int = 0
 var faction_color: Color = Color("3298ff"):
 	set(value):
 		faction_color = value
@@ -110,6 +114,7 @@ func visual_diameter() -> float:
 func _update_size() -> void:
 	if disk == null:
 		return
+	size_revision += 1
 	(disk.mesh as PlaneMesh).size = Vector2.ONE * visual_diameter()
 	(glow.mesh as PlaneMesh).size = Vector2.ONE * visual_diameter() * 1.55
 	var torus := rim.mesh as TorusMesh

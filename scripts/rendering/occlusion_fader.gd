@@ -4,6 +4,7 @@ extends RefCounted
 const FADED_ALPHA: float = 0.22
 const FADE_SPEED: float = 5.0
 var states: Dictionary = {}
+var material_writes: int = 0
 
 
 func register(objects: Array) -> void:
@@ -28,7 +29,10 @@ func step(delta: float, hole_position: Vector3, hole_radius: float) -> void:
 		var distance := Vector2(object.position.x - hole_position.x, object.position.z - hole_position.z).length()
 		var blocked := object.state != Swallowable.State.SETTLED and object.footprint_radius >= hole_radius
 		blocked = blocked and distance < object.footprint_radius + hole_radius * 0.4
-		state.amount = move_toward(float(state.amount), 1.0 if blocked else 0.0, delta * FADE_SPEED)
+		var next := move_toward(float(state.amount), 1.0 if blocked else 0.0, delta * FADE_SPEED)
+		if is_equal_approx(float(state.amount), next):
+			continue
+		state.amount = next
 		_apply(state)
 
 
@@ -38,8 +42,14 @@ func fade_amount(object: Swallowable) -> float:
 
 func reset() -> void:
 	for state in states.values():
+		if is_zero_approx(float(state.amount)):
+			continue
 		state.amount = 0.0
 		_apply(state)
+
+
+func unregister(object: Swallowable) -> void:
+	states.erase(object.get_instance_id())
 
 
 func _collect_materials(node: Node, records: Array[Dictionary]) -> void:
@@ -70,5 +80,6 @@ func _apply(state: Dictionary) -> void:
 		var color := record.color as Color
 		color.a *= lerpf(1.0, FADED_ALPHA, amount)
 		material.albedo_color = color
+		material_writes += 1
 		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA if amount > 0.001 else int(record.transparency)
 		record.mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF if amount > 0.05 else int(record.shadow)

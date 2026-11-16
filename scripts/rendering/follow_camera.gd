@@ -9,6 +9,7 @@ var base_offset := Vector3(0, 20, 15)
 var base_orthographic_size: float = 24.0
 var zoom: float = 1.0
 var smoothing: float = 10.0
+var zoom_smoothing: float = 7.0
 var initialized: bool = false
 var shake_strength: float = 0.0
 var visual_time: float = 0.0
@@ -47,21 +48,43 @@ func set_projection(mode: String) -> bool:
 
 func step(delta: float, target_position: Vector3, radius: float) -> void:
 	var desired := Vector3(target_position.x, 0, target_position.z)
+	finale_blend = move_toward(finale_blend, 1.0 if finale_active else 0.0, delta * 1.25)
+	var target_zoom := (1.0 + maxf(0.0, radius - 0.38) * 0.5) * lerpf(1.0, 1.55, finale_blend)
 	if not initialized:
 		position = desired
+		zoom = target_zoom
 		initialized = true
 	else:
 		position = position.lerp(desired, 1.0 - exp(-smoothing * delta))
-	finale_blend = move_toward(finale_blend, 1.0 if finale_active else 0.0, delta * 1.25)
-	zoom = (1.0 + maxf(0.0, radius - 0.38) * 0.5) * lerpf(1.0, 1.55, finale_blend)
-	var margin := Vector2(7.0, 9.0) * zoom
-	var half := map_size * 0.5
-	position.x = clampf(position.x, -half.x + margin.x, half.x - margin.x)
-	position.z = clampf(position.z, -half.y + margin.y, half.y - margin.y)
+		zoom = lerpf(zoom, target_zoom, 1.0 - exp(-zoom_smoothing * delta))
+	_clamp_to_map(desired)
 	visual_time += delta
 	shake_strength = move_toward(shake_strength, 0.0, delta * 0.65)
 	shake_offset = Vector3(sin(visual_time * 71.0), cos(visual_time * 83.0) * 0.35, cos(visual_time * 59.0)) * shake_strength
 	_update_camera_transform()
+
+
+func snap(target_position: Vector3, radius: float) -> void:
+	position = Vector3(target_position.x, 0, target_position.z)
+	zoom = (1.0 + maxf(0.0, radius - 0.38) * 0.5) * lerpf(1.0, 1.55, finale_blend)
+	initialized = true
+	shake_offset = Vector3.ZERO
+	_clamp_to_map(Vector3(target_position.x, 0, target_position.z))
+	_update_camera_transform()
+
+
+func _clamp_to_map(target_position: Vector3) -> void:
+	var margin := Vector2(7.0, 9.0) * zoom
+	var half := map_size * 0.5
+	var unclamped := position
+	position.x = clampf(position.x, -half.x + margin.x, half.x - margin.x)
+	position.z = clampf(position.z, -half.y + margin.y, half.y - margin.y)
+	# At a playable map edge, retaining the hole is more important than hiding
+	# the void beyond the ground. Out-of-map test targets remain map-clamped.
+	if not is_equal_approx(unclamped.x, position.x) and absf(target_position.x) <= half.x:
+		position.x = clampf(position.x, target_position.x - 0.5 * zoom, target_position.x + 0.5 * zoom)
+	if not is_equal_approx(unclamped.z, position.z) and absf(target_position.z) <= half.y:
+		position.z = clampf(position.z, target_position.z - 0.75 * zoom, target_position.z + 0.75 * zoom)
 
 
 func set_finale(active: bool) -> void:

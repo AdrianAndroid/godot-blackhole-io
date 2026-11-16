@@ -10,7 +10,7 @@ func run() -> void:
 		FailureReporter.record(swallowed, pursuit, "expected_swallowed", "match_swallowed_failure", 0.1)
 	expect(swallowed.state == GameSession.State.RESULT and swallowed.result.get("reason") == "swallowed", "大型对手通过真实接触和下沉完成整局失败: " + str(swallowed.snapshot()))
 	expect(swallowed.player_death_target != null and swallowed.player_death_target.state == Swallowable.State.SETTLED, "失败路径实际完成玩家下沉")
-	expect(swallowed.objective.current_score == 0 and swallowed.objective.coins == 0, "被吞失败结算数据保持独立")
+	expect(swallowed.result.get("score") == swallowed.objective.current_score and swallowed.result.get("coins") == swallowed.objective.coins, "被吞前合法奖励与失败结算保持一致")
 	expect(_finished_count(swallowed) == 1, "被吞路径唯一结局")
 	var swallowed_frozen := str(swallowed.snapshot())
 	swallowed._completed_events.append({"object_id": 777777, "kind": "normal", "score": 99, "coins": 9, "xp": 99})

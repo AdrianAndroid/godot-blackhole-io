@@ -96,7 +96,7 @@ func _prepare_checkpoint(checkpoint: String, session: GameSession) -> void:
 		"sinking":
 			var target := _first_eligible(session)
 			session.player.position = target.position
-			session.camera_rig.step(1.0, session.player.position, session.player.effective_radius)
+			session.camera_rig.snap(session.player.position, session.player.effective_radius)
 			session.step(0.01)
 			session.step(0.18)
 		"max_level":
@@ -116,7 +116,7 @@ func _prepare_checkpoint(checkpoint: String, session: GameSession) -> void:
 		"tower":
 			_unlock(session)
 			session.player.position = session.tower.position + Vector3(0, 0, 8)
-			session.camera_rig.step(1.0, session.player.position, session.player.effective_radius)
+			session.camera_rig.snap(session.player.position, session.player.effective_radius)
 			session._update_hud()
 		"victory":
 			_unlock(session)
@@ -128,8 +128,8 @@ func _prepare_checkpoint(checkpoint: String, session: GameSession) -> void:
 			session.step(0.01)
 			session.step(1.0)
 		"input_edge":
-			session.player.position = Vector3(-39.5, 0, -39.5)
-			session.camera_rig.step(1.0, session.player.position, session.player.effective_radius)
+			session.player.position = Vector3(-session.layout.map_size.x * 0.5 + 0.5, 0, -session.layout.map_size.y * 0.5 + 0.5)
+			session.camera_rig.snap(session.player.position, session.player.effective_radius)
 			var press := InputEventMouseButton.new()
 			press.button_index = MOUSE_BUTTON_LEFT
 			press.pressed = true
@@ -144,7 +144,7 @@ func _prepare_checkpoint(checkpoint: String, session: GameSession) -> void:
 				if object.footprint_radius > session.player.effective_radius * 2.0:
 					occluder = object
 					session.player.position = object.position
-					session.camera_rig.step(1.0, session.player.position, session.player.effective_radius)
+					session.camera_rig.snap(session.player.position, session.player.effective_radius)
 					if object.state != Swallowable.State.IDLE:
 						failures.append("不可吞建筑被错误吞噬")
 					break
@@ -153,12 +153,14 @@ func _prepare_checkpoint(checkpoint: String, session: GameSession) -> void:
 				if session.spawn_manager.occlusion_fader.fade_amount(occluder) < 0.99:
 					failures.append("遮挡建筑未完成半透明过渡")
 		"water_hole":
-			session.player.position = Vector3(34, 0, 0)
+			session.player.position = Vector3(CityGenerator.WATER_CENTER.x, 0, 0)
 			session.player.effective_radius = 1.2
-			session.camera_rig.step(1.0, session.player.position, session.player.effective_radius)
+			session.camera_rig.snap(session.player.position, session.player.effective_radius)
 
 
 func _capture_modes(checkpoint: String, session: GameSession, before: Dictionary) -> void:
+	if session != null:
+		_check_player_visible(checkpoint + "_perspective", session, session.camera_rig.perspective_camera)
 	var perspective := await _capture_image(checkpoint + "_perspective")
 	var entry := {"checkpoint": checkpoint, "perspective": perspective, "snapshot_before": before}
 	if session != null:
@@ -167,6 +169,7 @@ func _capture_modes(checkpoint: String, session: GameSession, before: Dictionary
 		var after := session.snapshot()
 		if str(before) != str(after):
 			failures.append(checkpoint + " 投影切换改变逻辑快照")
+		_check_player_visible(checkpoint + "_orthographic", session, session.camera_rig.orthographic_camera)
 	var orthographic := await _capture_image(checkpoint + "_orthographic")
 	entry["orthographic"] = orthographic
 	if session != null:
@@ -175,6 +178,14 @@ func _capture_modes(checkpoint: String, session: GameSession, before: Dictionary
 			if rect.position.x < 0 or rect.position.y < 0 or rect.end.x > 432 or rect.end.y > 960:
 				failures.append(checkpoint + " HUD 超出安全区")
 	reports.append(entry)
+
+
+func _check_player_visible(label: String, session: GameSession, camera: Camera3D) -> void:
+	if session.state != GameSession.State.PLAYING:
+		return
+	var screen := camera.unproject_position(session.player.global_position)
+	if camera.is_position_behind(session.player.global_position) or not camera.get_viewport().get_visible_rect().has_point(screen):
+		failures.append(label + " 玩家被镜头推出画面")
 
 
 func _capture_image(label: String) -> Dictionary:

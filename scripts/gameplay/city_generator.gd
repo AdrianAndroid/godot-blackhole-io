@@ -1,10 +1,18 @@
 class_name CityGenerator
 extends RefCounted
 
-const GENERATION_VERSION: int = 2
-const MAP_SIZE := Vector2(80, 80)
-const ROAD_COORDINATES: Array[float] = [-32.0, -16.0, 0.0, 16.0, 32.0]
-const BLOCK_COORDINATES: Array[float] = [-24.0, -8.0, 8.0, 24.0]
+const GENERATION_VERSION: int = 3
+const MAP_SIZE := Vector2(112, 112)
+const ROAD_TILE_SIZE: float = 4.0
+const ROAD_COORDINATES: Array[float] = [-48.0, -32.0, -16.0, 0.0, 16.0, 32.0, 48.0]
+const BLOCK_COORDINATES: Array[float] = [-40.0, -24.0, -8.0, 8.0, 24.0, 40.0]
+const WATER_CENTER := Vector2(50, 0)
+const WATER_SIZE := Vector2(12, 112)
+const BUILDING_EAST_LIMIT: float = 44.0
+const ROAD_EAST_LIMIT: float = 48.0
+const TOWER_POSITION := Vector3(40, 0, 46)
+const PLACEMENT_CELL_SIZE: float = 8.0
+const MAX_FOOTPRINT_RADIUS: float = 4.0
 const BUILDING_MODEL_IDS: Array[String] = [
 	"commercial_low_a", "commercial_low_b", "commercial_low_c", "commercial_a", "commercial_c",
 	"skyscraper_a", "skyscraper_b", "skyscraper_c", "house_a", "house_b", "house_c", "house_d",
@@ -22,10 +30,11 @@ class Layout:
 	var routes: Array[PackedVector3Array] = []
 	var opponent_radii: Array[float] = [0.22, 0.30, 0.36, 1.80]
 	var player_spawn := Vector3.ZERO
-	var tower_position := Vector3(24, 0, 30)
+	var tower_position := CityGenerator.TOWER_POSITION
 	var ordinary_total_score: int = 0
 	var target_score: int = 1
 	var signature: String = ""
+	var placement_cells: Dictionary = {}
 
 
 func generate(seed_value: int) -> Layout:
@@ -62,7 +71,7 @@ func _generate_attempt(seed_value: int, attempt: int) -> Layout:
 	]:
 		var starter_id := "cone" if next_id % 2 == 0 else "traffic_light"
 		if _can_place(layout, starter, 0.24):
-			layout.objects.append(_placement(next_id, starter_id, starter, rng))
+			_append_object(layout, _placement(next_id, starter_id, starter, rng))
 			next_id += 1
 	_populate_dynamic(layout, next_id, rng)
 	layout.ordinary_total_score = 0
@@ -74,23 +83,27 @@ func _generate_attempt(seed_value: int, attempt: int) -> Layout:
 
 
 func _build_road_network(layout: Layout, rng: RandomNumberGenerator) -> void:
-	# Every tile is four metres wide. Adjacent centres are also four metres apart,
-	# so lanes meet exactly instead of leaving the old eight-metre gaps.
-	for grid_x in range(-9, 10):
-		for grid_z in range(-9, 10):
-			var x := float(grid_x * 4)
-			var z := float(grid_z * 4)
-			if x >= 32.0:
+	# Adjacent four-metre tiles meet exactly. The east bank remains open water.
+	var half_tiles := int(MAP_SIZE.x / (ROAD_TILE_SIZE * 2.0))
+	for grid_x in range(-half_tiles + 1, half_tiles):
+		for grid_z in range(-half_tiles + 1, half_tiles):
+			var x := float(grid_x) * ROAD_TILE_SIZE
+			var z := float(grid_z) * ROAD_TILE_SIZE
+			if not _road_tile_expected(x, z):
 				continue
 			var vertical := ROAD_COORDINATES.has(x)
 			var horizontal := ROAD_COORDINATES.has(z)
-			if not vertical and not horizontal:
-				continue
 			var model_id := "road_crossroad" if vertical and horizontal else "road_straight"
 			var rotation_y := 0.0 if vertical else 90.0
 			if model_id == "road_crossroad":
 				rotation_y = float(rng.randi_range(0, 3)) * 90.0
 			layout.roads.append({"model_id": model_id, "position": Vector3(x, 0, z), "rotation_y": rotation_y})
+
+
+func _road_tile_expected(x: float, z: float) -> bool:
+	if x >= ROAD_EAST_LIMIT:
+		return false
+	return ROAD_COORDINATES.has(x) or ROAD_COORDINATES.has(z)
 
 
 func _populate_block(layout: Layout, center: Vector3, next_id: int, rng: RandomNumberGenerator) -> int:
@@ -105,31 +118,32 @@ func _populate_block(layout: Layout, center: Vector3, next_id: int, rng: RandomN
 	elif radius >= 2.0:
 		offsets.assign([Vector3(-3.6, 0, 0), Vector3(3.6, 0, 0)])
 	else:
-		offsets.assign([
-			Vector3(-3.6, 0, -3.6), Vector3(3.6, 0, -3.6),
-			Vector3(-3.6, 0, 3.6), Vector3(3.6, 0, 3.6),
-		])
+		for x in [-5.25, -1.75, 1.75, 5.25]:
+			for z in [-3.8, 3.8]:
+				offsets.append(Vector3(x, 0, z))
 	for offset in offsets:
 		var building_position := center + offset
 		# The river stays open instead of hiding partially submerged buildings.
-		if building_position.x + radius > 28.0:
+		if building_position.x + radius > BUILDING_EAST_LIMIT:
 			continue
 		if _can_place(layout, building_position, radius):
-			layout.objects.append(_placement(next_id, model_id, building_position, rng))
+			_append_object(layout, _placement(next_id, model_id, building_position, rng))
 			next_id += 1
-	var prop_count := 5 if central else rng.randi_range(3, 5)
+	var prop_count := 14 if central else rng.randi_range(10, 13)
 	var prop_offsets := [
-		Vector3(-6.0, 0, -1.8), Vector3(6.0, 0, 1.8), Vector3(-1.8, 0, -6.0),
-		Vector3(1.8, 0, 6.0), Vector3(-6.0, 0, 6.0), Vector3(6.0, 0, -6.0),
+		Vector3(-6.8, 0, -4.8), Vector3(-6.8, 0, -1.6), Vector3(-6.8, 0, 1.6), Vector3(-6.8, 0, 4.8),
+		Vector3(6.8, 0, -4.8), Vector3(6.8, 0, -1.6), Vector3(6.8, 0, 1.6), Vector3(6.8, 0, 4.8),
+		Vector3(-4.8, 0, -6.8), Vector3(-1.6, 0, -6.8), Vector3(1.6, 0, -6.8), Vector3(4.8, 0, -6.8),
+		Vector3(-4.8, 0, 6.8), Vector3(-1.6, 0, 6.8), Vector3(1.6, 0, 6.8), Vector3(4.8, 0, 6.8),
 	]
 	for prop_index in prop_count:
 		var prop_id := _pick_prop(rng, central)
-		var prop_position: Vector3 = center + prop_offsets[(prop_index + rng.randi_range(0, 1)) % prop_offsets.size()]
+		var prop_position: Vector3 = center + prop_offsets[(prop_index * 5 + rng.randi_range(0, 2)) % prop_offsets.size()]
 		var prop_radius := float(_catalog_entry(prop_id).footprint_radius)
-		if prop_position.x + prop_radius > 28.0:
+		if prop_position.x + prop_radius > BUILDING_EAST_LIMIT:
 			continue
 		if _can_place(layout, prop_position, prop_radius):
-			layout.objects.append(_placement(next_id, prop_id, prop_position, rng))
+			_append_object(layout, _placement(next_id, prop_id, prop_position, rng))
 			next_id += 1
 	return next_id
 
@@ -140,6 +154,9 @@ func _populate_dynamic(layout: Layout, next_id: int, rng: RandomNumberGenerator)
 	var pedestrian_index := 0
 	for block_x in BLOCK_COORDINATES:
 		for block_z in BLOCK_COORDINATES:
+			# The easternmost blocks border the river; keep routes on the road grid.
+			if block_x >= 40.0:
+				continue
 			var center := Vector3(block_x, 0, block_z)
 			if center.distance_to(layout.tower_position) < 9.0:
 				continue
@@ -149,11 +166,12 @@ func _populate_dynamic(layout: Layout, next_id: int, rng: RandomNumberGenerator)
 				Vector3(block_x + 6.8, 0, block_z + 6.8),
 				Vector3(block_x + 6.8, 0, block_z - 6.8),
 			])
-			if _add_dynamic(layout, next_id, "pedestrian", pedestrian_route, rng.randf_range(0.65, 1.05), str(pedestrian_index % 4), rng):
-				next_id += 1
-			pedestrian_index += 1
-			if block_x >= 24.0:
-				continue
+			var pedestrian_speed := rng.randf_range(0.65, 1.05)
+			for slot in 4:
+				var phase := (float(slot) + 0.15 * float(pedestrian_index % 2)) / 4.0
+				if _add_dynamic(layout, next_id, "pedestrian", pedestrian_route, pedestrian_speed, str(pedestrian_index % 4), rng, phase):
+					next_id += 1
+				pedestrian_index += 1
 			var lane := 0.72 if vehicle_index % 2 == 0 else -0.72
 			var vehicle_route := PackedVector3Array([
 				Vector3(block_x - 8.0 + lane, 0, block_z - 8.0),
@@ -161,30 +179,54 @@ func _populate_dynamic(layout: Layout, next_id: int, rng: RandomNumberGenerator)
 				Vector3(block_x + 8.0 + lane, 0, block_z + 8.0),
 				Vector3(block_x - 8.0 + lane, 0, block_z + 8.0),
 			])
-			if _add_dynamic(layout, next_id, vehicle_ids[vehicle_index % vehicle_ids.size()], vehicle_route, rng.randf_range(1.4, 2.2), "", rng):
-				next_id += 1
+			for phase_index in 12:
+				if _add_dynamic(layout, next_id, vehicle_ids[vehicle_index % vehicle_ids.size()], vehicle_route, rng.randf_range(1.4, 2.2), "", rng, float(phase_index) / 12.0):
+					next_id += 1
+					break
 			vehicle_index += 1
-	for index in 6:
-		var x := 30.5 + float(index % 2) * 4.0
-		var z := -25.0 + float(index) * 10.0
+	for index in 12:
+		var x := 46.5 + float(index % 2) * 4.0
+		var z := -44.0 + float(index) * 7.0
 		var duck_route := PackedVector3Array([
 			Vector3(x, 0, z - 2.0), Vector3(x + 2.2, 0, z - 2.0),
 			Vector3(x + 2.2, 0, z + 2.0), Vector3(x, 0, z + 2.0),
 		])
-		if _add_dynamic(layout, next_id, "duck", duck_route, 0.35 + float(index) * 0.025, "", rng):
+		if _add_dynamic(layout, next_id, "duck", duck_route, 0.35 + float(index % 6) * 0.025, "", rng):
 			next_id += 1
 
 
-func _add_dynamic(layout: Layout, id: int, model_id: String, route: PackedVector3Array, speed: float, variant: String, rng: RandomNumberGenerator) -> bool:
+func _add_dynamic(layout: Layout, id: int, model_id: String, route: PackedVector3Array, speed: float, variant: String, rng: RandomNumberGenerator, phase_ratio: float = 0.0) -> bool:
 	var radius := float(_catalog_entry(model_id).footprint_radius)
-	if not _can_place(layout, route[0], radius):
+	var phase := _route_length(route) * clampf(phase_ratio, 0.0, 0.999)
+	var start := _point_on_route(route, phase)
+	if not _can_place(layout, start, radius):
 		return false
-	var placement := _placement(id, model_id, route[0], rng)
+	var placement := _placement(id, model_id, start, rng)
 	placement["route"] = route
 	placement["route_speed"] = speed
+	placement["route_phase"] = phase
 	placement["variant"] = variant
-	layout.objects.append(placement)
+	_append_object(layout, placement)
 	return true
+
+
+func _route_length(route: PackedVector3Array) -> float:
+	var result := 0.0
+	for index in route.size():
+		result += route[index].distance_to(route[(index + 1) % route.size()])
+	return result
+
+
+func _point_on_route(route: PackedVector3Array, distance: float) -> Vector3:
+	var remaining := distance
+	for index in route.size():
+		var start := route[index]
+		var end := route[(index + 1) % route.size()]
+		var length := start.distance_to(end)
+		if remaining <= length or index == route.size() - 1:
+			return start.lerp(end, clampf(remaining / length, 0.0, 1.0))
+		remaining -= length
+	return route[0]
 
 
 func validate_layout(layout: Layout) -> Array[String]:
@@ -219,24 +261,35 @@ func validate_layout(layout: Layout) -> Array[String]:
 		errors.append("缺少出生小物体")
 	if nearby_buildings < 8:
 		errors.append("出生点 20 米内建筑不足 8 栋")
-	if dynamic_counts.vehicles < 8 or dynamic_counts.characters < 12 or dynamic_counts.duck < 6:
+	if dynamic_counts.vehicles < 20 or dynamic_counts.characters < 80 or dynamic_counts.duck < 12:
 		errors.append("车辆/行人/鸭子密度不足")
 	for required_district in ["commercial", "suburban", "industrial", "roads"]:
 		if not districts.has(required_district):
 			errors.append("四类素材分区不完整")
-	for first_index in layout.objects.size():
-		var first: Dictionary = layout.objects[first_index]
-		var first_radius := float(_catalog_entry(first.model_id).footprint_radius)
-		for second_index in range(first_index + 1, layout.objects.size()):
-			var second: Dictionary = layout.objects[second_index]
-			var second_radius := float(_catalog_entry(second.model_id).footprint_radius)
-			if first.position.distance_to(second.position) + 0.001 < first_radius + second_radius:
-				errors.append("物体非法重叠")
-				return errors
-	if layout.roads.size() != 141:
+	var validation_cells: Dictionary = {}
+	for object in layout.objects:
+		var cell := _cell(object.position)
+		for x in range(cell.x - 1, cell.x + 2):
+			for z in range(cell.y - 1, cell.y + 2):
+				for other in validation_cells.get(Vector2i(x, z), []):
+					var first_radius := float(_catalog_entry(object.model_id).footprint_radius)
+					var second_radius := float(_catalog_entry(other.model_id).footprint_radius)
+					if object.position.distance_to(other.position) + 0.001 < first_radius + second_radius:
+						errors.append("物体非法重叠")
+						return errors
+		if not validation_cells.has(cell):
+			validation_cells[cell] = []
+		validation_cells[cell].append(object)
+	var expected_roads := 0
+	var half_tiles := int(MAP_SIZE.x / (ROAD_TILE_SIZE * 2.0))
+	for grid_x in range(-half_tiles + 1, half_tiles):
+		for grid_z in range(-half_tiles + 1, half_tiles):
+			if _road_tile_expected(float(grid_x) * ROAD_TILE_SIZE, float(grid_z) * ROAD_TILE_SIZE):
+				expected_roads += 1
+	if layout.roads.size() != expected_roads:
 		errors.append("连续道路地块数量错误")
 	for road in layout.roads:
-		if absf(road.position.x) > 36.0 or absf(road.position.z) > 36.0:
+		if absf(road.position.x) + ROAD_TILE_SIZE * 0.5 > layout.map_size.x * 0.5 or absf(road.position.z) + ROAD_TILE_SIZE * 0.5 > layout.map_size.y * 0.5:
 			errors.append("道路越出无缝网格")
 	if layout.routes.size() != 4:
 		errors.append("对手路线数量错误")
@@ -245,36 +298,43 @@ func validate_layout(layout: Layout) -> Array[String]:
 			errors.append("出生点被大型对手威胁")
 	var simulated_growth := GrowthManager.new()
 	var simulated_score := 0
-	var consumed: Dictionary = {}
-	while simulated_score < layout.target_score:
-		var found := false
-		for object in layout.objects:
-			if consumed.has(object.id):
-				continue
-			var entry := _catalog_entry(object.model_id)
-			if float(entry.footprint_radius) < simulated_growth.radius:
-				consumed[object.id] = true
-				simulated_growth.add_experience(int(entry.xp))
-				simulated_score += int(entry.score)
-				found = true
-				if simulated_score >= layout.target_score:
-					break
-		if not found:
-			errors.append("连续成长路径无法达到目标")
+	var growth_order: Array[Dictionary] = layout.objects.duplicate()
+	growth_order.sort_custom(func(first: Dictionary, second: Dictionary) -> bool:
+		var first_radius := float(_catalog_entry(first.model_id).footprint_radius)
+		var second_radius := float(_catalog_entry(second.model_id).footprint_radius)
+		if is_equal_approx(first_radius, second_radius):
+			return int(first.id) < int(second.id)
+		return first_radius < second_radius
+	)
+	for object in growth_order:
+		if simulated_score >= layout.target_score:
 			break
+		var entry := _catalog_entry(object.model_id)
+		if float(entry.footprint_radius) >= simulated_growth.radius:
+			break
+		simulated_growth.add_experience(int(entry.xp))
+		simulated_score += int(entry.score)
+	if simulated_score < layout.target_score:
+		errors.append("连续成长路径无法达到目标")
 	if layout.target_score != maxi(1, ceili(float(layout.ordinary_total_score) * 0.75)):
 		errors.append("目标预算错误")
 	return errors
 
 
 func layout_signature(layout: Layout) -> String:
-	var parts: Array[String] = [str(layout.generation_version), str(layout.seed_value), str(layout.attempt)]
+	var parts: Array[String] = [
+		str(layout.generation_version), str(layout.seed_value), str(layout.attempt),
+		"map:%.3f:%.3f" % [layout.map_size.x, layout.map_size.y],
+		"spawn:%s" % str(layout.player_spawn), "tower:%s" % str(layout.tower_position),
+		"budget:%d:%d" % [layout.ordinary_total_score, layout.target_score],
+		"opponents:%s" % str(layout.opponent_radii),
+	]
 	for road in layout.roads:
 		parts.append("road:%s:%.3f:%.3f:%.1f" % [road.model_id, road.position.x, road.position.z, road.rotation_y])
 	for object in layout.objects:
 		parts.append("%d:%s:%.3f:%.3f:%.1f:%s" % [object.id, object.model_id, object.position.x, object.position.z, object.rotation_y, object.variant])
 		if object.has("route"):
-			parts.append("speed:%.4f" % float(object.route_speed))
+			parts.append("speed:%.4f:phase:%.4f" % [float(object.route_speed), float(object.get("route_phase", 0.0))])
 			for point in object.route:
 				parts.append("dynamic:%.3f:%.3f" % [point.x, point.z])
 	for route in layout.routes:
@@ -301,10 +361,22 @@ func _pick_building(rng: RandomNumberGenerator, position: Vector3) -> String:
 func _pick_prop(rng: RandomNumberGenerator, central: bool) -> String:
 	var choices: Array[String] = []
 	if central:
-		choices.assign(["cone", "cone", "traffic_light", "street_light", "tree", "construction_barrier", "road_sign_street"])
+		choices.assign(["cone", "cone", "traffic_light", "street_light", "tree", "construction_barrier", "road_sign_street", "parasol", "planter"])
 	else:
-		choices.assign(["cone", "traffic_light", "street_light", "tree", "planter", "dumpster", "construction_light", "road_sign_stop"])
+		choices.assign(["cone", "traffic_light", "street_light", "tree", "planter", "dumpster", "construction_light", "road_sign_stop", "container", "parasol"])
 	return choices[rng.randi_range(0, choices.size() - 1)]
+
+
+func _append_object(layout: Layout, placement: Dictionary) -> void:
+	layout.objects.append(placement)
+	var cell := _cell(placement.position)
+	if not layout.placement_cells.has(cell):
+		layout.placement_cells[cell] = []
+	layout.placement_cells[cell].append(placement)
+
+
+func _cell(position: Vector3) -> Vector2i:
+	return Vector2i(floori(position.x / PLACEMENT_CELL_SIZE), floori(position.z / PLACEMENT_CELL_SIZE))
 
 
 func _can_place(layout: Layout, position: Vector3, radius: float) -> bool:
@@ -312,17 +384,21 @@ func _can_place(layout: Layout, position: Vector3, radius: float) -> bool:
 		return false
 	if position.distance_to(layout.tower_position) < radius + 4.0:
 		return false
-	for object in layout.objects:
-		var other_radius := float(_catalog_entry(object.model_id).footprint_radius)
-		if position.distance_to(object.position) < radius + other_radius + 0.15:
-			return false
+	var cell := _cell(position)
+	var reach := ceili((radius + MAX_FOOTPRINT_RADIUS + 0.15) / PLACEMENT_CELL_SIZE)
+	for x in range(cell.x - reach, cell.x + reach + 1):
+		for z in range(cell.y - reach, cell.y + reach + 1):
+			for object in layout.placement_cells.get(Vector2i(x, z), []):
+				var other_radius := float(_catalog_entry(object.model_id).footprint_radius)
+				if position.distance_to(object.position) < radius + other_radius + 0.15:
+					return false
 	return true
 
 
 func _make_routes(rng: RandomNumberGenerator) -> Array[PackedVector3Array]:
 	var result: Array[PackedVector3Array] = []
-	var centers := [Vector2(-24, 0), Vector2(24, -4), Vector2(4, 24), Vector2(-12, -26)]
-	var extents := [Vector2(5, 9), Vector2(5, 8), Vector2(8, 4), Vector2(7, 5)]
+	var centers := [Vector2(-32, 0), Vector2(32, -8), Vector2(8, 32), Vector2(-16, -38)]
+	var extents := [Vector2(10, 14), Vector2(10, 12), Vector2(14, 7), Vector2(12, 8)]
 	for index in 4:
 		var center: Vector2 = centers[index]
 		var extent: Vector2 = extents[index]

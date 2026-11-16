@@ -14,6 +14,12 @@ var muted: bool = false
 var volume_db: float = -12.0
 var event_counts: Dictionary = {}
 var active_players: Dictionary = {}
+var streams: Dictionary = {}
+
+
+func _ready() -> void:
+	for cue in CUES:
+		streams[cue] = load(CUES[cue])
 
 
 func play(cue: String) -> void:
@@ -25,7 +31,7 @@ func play(cue: String) -> void:
 	var player: AudioStreamPlayer = active_players.get(cue)
 	if not is_instance_valid(player):
 		player = AudioStreamPlayer.new()
-		player.stream = load(CUES[cue])
+		player.stream = streams[cue]
 		add_child(player)
 		active_players[cue] = player
 	player.volume_db = volume_db

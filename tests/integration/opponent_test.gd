@@ -12,19 +12,19 @@ func run() -> void:
 		radii.append(opponent.actor.effective_radius)
 		expect(opponent.actor.effective_radius == session.layout.opponent_radii[index], "两小一接近一大配置")
 	expect(colors.size() == 4, "四个不同阵营色")
-	for index in 300:
+	for index in 1200:
 		session.step(1.0 / 60.0)
 	for index in 4:
 		expect(session.opponents[index].actor.effective_radius == radii[index], "整个对局对手不成长")
 
 	var second := _session(7001)
-	for index in 300:
+	for index in 1200:
 		second.step(1.0 / 60.0)
 	var routes_equal := true
 	for index in 4:
 		routes_equal = routes_equal and session.opponents[index].position.is_equal_approx(second.opponents[index].position)
 		expect(session.opponents[index].position.y == 0.0, "路线保持 XZ 平面")
-		expect(absf(session.opponents[index].position.x) <= 40.0 and absf(session.opponents[index].position.z) <= 40.0, "路线不越界")
+		expect(absf(session.opponents[index].position.x) <= session.layout.map_size.x * 0.5 and absf(session.opponents[index].position.z) <= session.layout.map_size.y * 0.5, "路线不越界")
 	expect(routes_equal, "固定步进路线位置可复现")
 	expect(session.opponents[0].waypoint != 1, "路线节点切换")
 	# Opponents never enter the player-opponent contact loop as each other's attacker.

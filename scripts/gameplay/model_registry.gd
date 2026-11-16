@@ -114,14 +114,15 @@ func _valid_bounds(bounds: AABB) -> bool:
 
 
 func _apply_variant(node: Node, variant: String) -> void:
-	if node is MeshInstance3D:
+	if node is MeshInstance3D and node.mesh != null:
 		var texture_path := "res://assets/game/models/commercial/Textures/variation-%s.png" % variant
 		if ResourceLoader.exists(texture_path):
-			var material: Material = node.get_active_material(0)
-			if material is StandardMaterial3D:
-				var copy := material.duplicate() as StandardMaterial3D
-				copy.albedo_texture = load(texture_path)
-				node.material_override = copy
+			for surface in node.mesh.get_surface_count():
+				var material: Material = node.get_active_material(surface)
+				if material is StandardMaterial3D:
+					var copy := material.duplicate() as StandardMaterial3D
+					copy.albedo_texture = load(texture_path)
+					node.set_surface_override_material(surface, copy)
 	for child in node.get_children():
 		_apply_variant(child, variant)
 

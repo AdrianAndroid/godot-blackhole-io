@@ -35,6 +35,7 @@ var input_controller: InputController
 var hud: HudController
 var audio: AudioManager
 var attraction_bursts: Array[AttractionBurst] = []
+var attraction_pool: Array[AttractionBurst] = []
 var _completed_events: Array[Dictionary] = []
 
 
@@ -69,7 +70,7 @@ func _build() -> void:
 	camera_rig = FollowCamera.new()
 	camera_rig.map_size = layout.map_size
 	add_child(camera_rig)
-	camera_rig.step(1.0, player.position, player.effective_radius)
+	camera_rig.snap(player.position, player.effective_radius)
 	var input_layer := CanvasLayer.new()
 	input_layer.layer = 5
 	add_child(input_layer)
@@ -82,6 +83,11 @@ func _build() -> void:
 	hud.home_requested.connect(func() -> void: home_requested.emit())
 	audio = AudioManager.new()
 	add_child(audio)
+	for index in 12:
+		var effect := AttractionBurst.new()
+		effect.prepare()
+		add_child(effect)
+		attraction_pool.append(effect)
 	begin()
 
 
@@ -96,18 +102,33 @@ func begin() -> void:
 
 func _physics_process(delta: float) -> void:
 	if automatic:
-		step(delta)
+		_step_gameplay(delta)
 
 
+func _process(delta: float) -> void:
+	var finishing_camera := state == State.RESULT and camera_rig != null and camera_rig.finale_active and camera_rig.finale_blend < 1.0
+	if automatic and (state == State.PLAYING or finishing_camera):
+		_step_presentation(delta)
+
+
+# Manual tests and replay drivers advance both layers explicitly. Production
+# physics and rendering call the two layers independently at their own cadence.
 func step(delta: float) -> void:
+	if state != State.PLAYING:
+		return
+	_step_gameplay(delta)
+	_step_presentation(delta)
+
+
+func _step_gameplay(delta: float) -> void:
 	if state != State.PLAYING:
 		return
 	remaining_time = maxf(0.0, remaining_time - delta)
 	objective.match_time += delta
 	var direction := drive_input if driver_enabled else input_controller.input_vector
-	for object in spawn_manager.objects.values():
+	for object in spawn_manager.dynamic_objects:
 		if is_instance_valid(object):
-			object.advance_route(delta)
+			object.advance_route(delta, false)
 	if player.alive:
 		player.step(delta, direction)
 	for opponent in opponents:
@@ -116,15 +137,26 @@ func step(delta: float) -> void:
 		_check_swallow_contacts()
 	swallow_manager.step(delta)
 	_process_completed_events()
+
+
+func _step_presentation(delta: float) -> void:
+	player.visual.step(delta)
+	for opponent in opponents:
+		opponent.actor.visual.step(delta)
 	for index in range(attraction_bursts.size() - 1, -1, -1):
 		var effect := attraction_bursts[index]
 		effect.step(delta)
 		if effect.finished():
-			effect.queue_free()
+			effect.release()
+			attraction_pool.append(effect)
 			attraction_bursts.remove_at(index)
 	hud.step(delta)
 	spawn_manager.advance_visuals(delta, player.position, player.effective_radius)
 	camera_rig.step(delta, player.position, player.effective_radius)
+	var camera := camera_rig.orthographic_camera if camera_rig.projection == "orthographic" else camera_rig.perspective_camera
+	for object in spawn_manager.dynamic_objects:
+		if is_instance_valid(object):
+			object.advance_animation_frame(delta, camera)
 	_update_hud()
 
 
@@ -136,8 +168,13 @@ func _on_swallow_claimed(object: Swallowable, hole: HoleActor) -> void:
 		hud.show_message("终点塔下沉中…")
 		_record("tower_swallow_started", {"position": object.position})
 	if object.kind in ["normal", "opponent"]:
-		var effect := AttractionBurst.new()
-		add_child(effect)
+		var effect: AttractionBurst
+		if attraction_pool.is_empty():
+			effect = AttractionBurst.new()
+			effect.prepare()
+			add_child(effect)
+		else:
+			effect = attraction_pool.pop_back()
 		effect.setup(object.global_position, hole, hole.faction_color)
 		attraction_bursts.append(effect)
 
@@ -196,11 +233,13 @@ func _process_completed_events() -> void:
 			"normal", "opponent":
 				if objective.settle(event):
 					var levels := growth.add_experience(int(event.xp))
-					player.effective_radius = growth.radius
+					if not levels.is_empty():
+						player.effective_radius = growth.radius
 					player.visual.trigger_pulse(1.0)
 					camera_rig.add_shake(0.10 if event.kind == "opponent" else 0.035)
 					hud.show_devour(event, levels, _feedback_screen_position())
-					spawn_manager.objects.erase(int(event.object_id))
+					if event.kind == "normal":
+						spawn_manager.retire_normal(int(event.object_id))
 					if event.kind == "opponent":
 						audio.play("knockdown")
 						hud.show_message("%d 连击！" % objective.multi_knockdown if objective.multi_knockdown >= 2 else "击倒对手 +%d 目标分" % int(event.score))

@@ -9,24 +9,37 @@ var start_position := Vector3.ZERO
 var trail_color := Color("3298ff")
 var mesh_instance: MeshInstance3D
 var material: StandardMaterial3D
+var immediate_mesh: ImmediateMesh
+var mesh_revision: int = 0
 
 
-func setup(start_value: Vector3, hole: HoleActor, color: Color) -> void:
-	start_position = start_value
-	target = hole
-	trail_color = color
+func prepare() -> void:
+	if mesh_instance != null:
+		return
 	mesh_instance = MeshInstance3D.new()
 	mesh_instance.name = "AttractionTrails"
 	mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	immediate_mesh = ImmediateMesh.new()
+	mesh_instance.mesh = immediate_mesh
 	material = StandardMaterial3D.new()
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.albedo_color = Color(color.lightened(0.4), 0.75)
 	material.emission_enabled = true
-	material.emission = color
 	material.emission_energy_multiplier = 0.7
 	mesh_instance.material_override = material
 	add_child(mesh_instance)
+	visible = false
+
+
+func setup(start_value: Vector3, hole: HoleActor, color: Color) -> void:
+	prepare()
+	start_position = start_value
+	target = hole
+	trail_color = color
+	age = 0.0
+	visible = true
+	material.albedo_color = Color(color.lightened(0.4), 0.75)
+	material.emission = color
 	_rebuild_trails()
 
 
@@ -42,17 +55,25 @@ func finished() -> bool:
 	return age >= DURATION or not is_instance_valid(target)
 
 
+func release() -> void:
+	target = null
+	age = 0.0
+	visible = false
+	if immediate_mesh != null:
+		immediate_mesh.clear_surfaces()
+
+
 func _rebuild_trails() -> void:
 	if mesh_instance == null or not is_instance_valid(target):
 		return
 	var end := target.global_position + Vector3(0, 0.10, 0)
-	var immediate := ImmediateMesh.new()
+	immediate_mesh.clear_surfaces()
+	mesh_revision += 1
 	for lane in 3:
-		immediate.surface_begin(Mesh.PRIMITIVE_LINE_STRIP)
+		immediate_mesh.surface_begin(Mesh.PRIMITIVE_LINE_STRIP)
 		for index in 13:
 			var t := float(index) / 12.0
 			var point := start_position.lerp(end, t)
 			point.y += sin(t * PI) * (0.20 + lane * 0.055)
-			immediate.surface_add_vertex(point)
-		immediate.surface_end()
-	mesh_instance.mesh = immediate
+			immediate_mesh.surface_add_vertex(point)
+		immediate_mesh.surface_end()

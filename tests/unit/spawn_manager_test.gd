@@ -48,9 +48,11 @@ func run() -> void:
 	expect(swallow.try_claim(target, hole), "城市物体可进入吞噬")
 	swallow.step(1.0)
 	expect(target.state == Swallowable.State.SETTLED and not target.visible, "当局物体永久消失")
+	spawn.retire_normal(target.object_id)
+	expect(not spawn.objects.has(target.object_id) and target.model_root == null, "结算后释放渲染资源引用并保留事务状态")
 	for index in 600:
 		swallow.step(1.0)
-	expect(spawn.objects.size() == original_count, "推进对局时间不补生成")
+	expect(spawn.objects.size() == original_count - 1, "推进对局时间不补生成")
 	var restored := SpawnManager.new()
 	restored.build(generator.generate(2468))
 	expect(restored.objects.size() == original_count, "重试恢复全部物体")

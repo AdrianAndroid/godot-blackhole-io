@@ -76,10 +76,16 @@ func _multi_knockdown_match() -> void:
 	session.opponents[1].position = session.player.position
 	var score_before: int = session.objective.current_score
 	var coins_before: int = session.objective.coins
+	var ordinary := {"score": 0, "coins": 0}
+	session.swallow_manager.completed.connect(func(event: Dictionary) -> void:
+		if event.kind == "normal":
+			ordinary.score += int(event.score)
+			ordinary.coins += int(event.coins)
+	)
 	session.step(0.01)
 	session.step(1.0)
 	expect(session.objective.knockdowns == 2 and session.objective.multi_knockdown == 2, "完整对局中实际触发二重击倒")
-	expect(session.objective.current_score == score_before + 120 and session.objective.coins == coins_before, "多重击倒只增加既定目标分")
+	expect(session.objective.current_score == score_before + 120 + int(ordinary.score) and session.objective.coins == coins_before + int(ordinary.coins), "多重击倒增加既定目标分，合法同帧普通吞噬独立结算: score %d -> %d, ordinary=%d, coins %d -> %d, ordinary_coins=%d" % [score_before, session.objective.current_score, int(ordinary.score), coins_before, session.objective.coins, int(ordinary.coins)])
 	driver.run(session)
 	expect(session.state == GameSession.State.RESULT and _finished_count(session) == 1, "多重击倒后的完整对局唯一结束")
 	expect(session.layout.signature == session.generator.generate(8243).signature, "多重击倒不消耗或改变城市随机流")

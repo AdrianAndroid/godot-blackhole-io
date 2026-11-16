@@ -71,7 +71,7 @@ func capture_transform() -> void:
 	_initial_rotation = rotation
 
 
-func advance_route(delta: float) -> void:
+func advance_route(delta: float, advance_animation: bool = true) -> void:
 	if state != State.IDLE or motion_route.size() < 2 or _route_length <= 0.0:
 		return
 	route_distance = fposmod(route_distance + motion_speed * delta, _route_length)
@@ -87,10 +87,22 @@ func advance_route(delta: float) -> void:
 				rotation.y = atan2(-direction.x, -direction.z)
 			break
 		remaining -= segment_length
-	if _animation_player != null:
-		_animation_player.advance(delta)
+	if advance_animation:
+		advance_animation_frame(delta)
 	if model_id == "duck":
 		model_root.position.y = 0.03 + sin(route_distance * 3.0) * 0.035
+
+
+func advance_animation_frame(delta: float, camera: Camera3D = null) -> void:
+	if _animation_player == null or state != State.IDLE:
+		return
+	if camera != null and camera.is_inside_tree():
+		if camera.is_position_behind(global_position):
+			return
+		var screen := camera.unproject_position(global_position)
+		if not camera.get_viewport().get_visible_rect().grow(100.0).has_point(screen):
+			return
+	_animation_player.advance(delta)
 
 
 func _find_animation_player(node: Node) -> AnimationPlayer:
@@ -149,3 +161,26 @@ func cancel() -> void:
 	scale = _initial_scale
 	rotation = _initial_rotation
 	visible = true
+
+
+func release_visual() -> void:
+	visible = false
+	if is_instance_valid(_animation_player):
+		_animation_player.stop()
+	_animation_player = null
+	if is_instance_valid(model_root):
+		_clear_surface_overrides(model_root)
+		model_root.free()
+		model_root = null
+	if is_instance_valid(area):
+		area.monitoring = false
+		area.monitorable = false
+		area.process_mode = Node.PROCESS_MODE_DISABLED
+
+
+func _clear_surface_overrides(node: Node) -> void:
+	if node is MeshInstance3D and node.mesh != null:
+		for surface in node.mesh.get_surface_count():
+			node.set_surface_override_material(surface, null)
+	for child in node.get_children():
+		_clear_surface_overrides(child)

@@ -30,6 +30,19 @@ func run() -> void:
 		expect_near(cone.scale.x, 3.0, 0.0001, "统一缩放")
 		expect(is_equal_approx(cone.position.y, 0.0), "地面原点")
 		cone.free()
+	var commercial := registry.instantiate("commercial_low_a", "a")
+	var meshes := commercial.find_children("*", "MeshInstance3D", true, false)
+	var textured_surfaces := 0
+	expect(not meshes.is_empty(), "商业建筑包含实时网格")
+	for node in meshes:
+		var mesh := node as MeshInstance3D
+		expect(mesh.material_override == null, "配色使用逐表面材质而非整网格覆盖")
+		for surface in mesh.mesh.get_surface_count():
+			var material := mesh.get_surface_override_material(surface) as StandardMaterial3D
+			if material != null and material.albedo_texture != null and material.albedo_texture.resource_path.ends_with("variation-a.png"):
+				textured_surfaces += 1
+	expect(textured_surfaces > 0, "商业配色纹理实际应用到表面材质")
+	commercial.free()
 	var pedestrian := registry.instantiate("pedestrian", "2")
 	var runner := registry._find_animation_player(pedestrian)
 	expect(runner != null and runner.has_animation("run"), "行人合并真实跑步骨骼动画")

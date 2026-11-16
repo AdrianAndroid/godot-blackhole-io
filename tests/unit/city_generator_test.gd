@@ -11,16 +11,21 @@ func run() -> void:
 	expect(signature == second.signature, "相同种子与生成版本完全复现")
 	expect(generator.generate(12346).signature != signature, "不同种子布局不同")
 	var nearby_buildings := 0
+	var building_count := 0
 	var dynamic_models := {"pedestrian": 0, "duck": 0, "vehicles": 0}
 	for object in first.objects:
-		if CityGenerator.BUILDING_MODEL_IDS.has(object.model_id) and object.position.length() <= 20.0:
-			nearby_buildings += 1
+		if CityGenerator.BUILDING_MODEL_IDS.has(object.model_id):
+			building_count += 1
+			if object.position.length() <= 20.0:
+				nearby_buildings += 1
 		if dynamic_models.has(object.model_id):
 			dynamic_models[object.model_id] += 1
 		elif object.has("route"):
 			dynamic_models.vehicles += 1
 	expect(nearby_buildings >= 8, "出生点 20 米内至少 8 栋建筑")
-	expect(dynamic_models.pedestrian >= 12 and dynamic_models.duck >= 6 and dynamic_models.vehicles >= 8, "行人/鸭子/车辆达到城市密度门槛")
+	expect(building_count >= 120 and first.objects.size() >= 450, "扩大城市具有充足建筑与物件密度")
+	expect(first.map_size == Vector2(112, 112) and first.roads.size() == 295, "112 米地图和道路数量由网格几何推导")
+	expect(dynamic_models.pedestrian >= 80 and dynamic_models.duck >= 12 and dynamic_models.vehicles >= 20, "行人/鸭子/车辆达到扩充后的城市密度门槛")
 	var changed_route := generator.generate(12345)
 	changed_route.objects.back().route[0].x += 1.0
 	expect(generator.layout_signature(changed_route) != signature, "布局签名覆盖动态路线")

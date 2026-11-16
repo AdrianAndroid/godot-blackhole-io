@@ -69,18 +69,24 @@ static func add_ground_details(root: Node3D) -> void:
 	var grass_root := Node3D.new()
 	grass_root.name = "GrassIslands"
 	root.add_child(grass_root)
-	for center in [Vector2(-24, -24), Vector2(-24, 8), Vector2(8, 24), Vector2(24, -8)]:
-		var grass := MeshInstance3D.new()
-		grass.name = "Grass"
-		var mesh := PlaneMesh.new()
-		mesh.size = Vector2(10.5, 10.5)
-		grass.mesh = mesh
-		grass.position = Vector3(center.x, 0.012, center.y)
-		var material := StandardMaterial3D.new()
-		material.albedo_color = Color("3e762f")
-		material.roughness = 0.98
-		grass.material_override = material
-		grass_root.add_child(grass)
+	for block_x in CityGenerator.BLOCK_COORDINATES:
+		for block_z in CityGenerator.BLOCK_COORDINATES:
+			var center := Vector2(block_x, block_z)
+			if posmod(int(block_x / 8.0) + int(block_z / 8.0), 4) != 0:
+				continue
+			if center.distance_to(Vector2(CityGenerator.TOWER_POSITION.x, CityGenerator.TOWER_POSITION.z)) < 9.0:
+				continue
+			var grass := MeshInstance3D.new()
+			grass.name = "Grass"
+			var mesh := PlaneMesh.new()
+			mesh.size = Vector2(10.5, 10.5)
+			grass.mesh = mesh
+			grass.position = Vector3(center.x, 0.012, center.y)
+			var material := StandardMaterial3D.new()
+			material.albedo_color = Color("3e762f")
+			material.roughness = 0.98
+			grass.material_override = material
+			grass_root.add_child(grass)
 
 
 static func add_water(root: Node3D, center: Vector2, size: Vector2) -> MeshInstance3D:
@@ -125,6 +131,48 @@ static func style_road(model: Node3D) -> void:
 				model.set_surface_override_material(surface, material)
 	for child in model.get_children():
 		style_road(child)
+
+
+static func add_roads(root: Node3D, roads: Array[Dictionary], registry: ModelRegistry) -> void:
+	var grouped: Dictionary = {}
+	for road in roads:
+		var model_id := str(road.model_id)
+		if not grouped.has(model_id):
+			grouped[model_id] = []
+		grouped[model_id].append(road)
+	for model_id in grouped:
+		var template := registry.instantiate(model_id)
+		style_road(template)
+		var mesh_instance := _first_mesh(template)
+		if mesh_instance == null or mesh_instance.mesh.get_surface_count() != 1:
+			template.free()
+			continue
+		var batch := MultiMeshInstance3D.new()
+		batch.name = model_id.to_pascal_case() + "Batch"
+		batch.material_override = mesh_instance.get_active_material(0)
+		var multimesh := MultiMesh.new()
+		multimesh.transform_format = MultiMesh.TRANSFORM_3D
+		multimesh.mesh = mesh_instance.mesh
+		multimesh.instance_count = grouped[model_id].size()
+		for index in grouped[model_id].size():
+			var road: Dictionary = grouped[model_id][index]
+			var yaw := deg_to_rad(float(road.rotation_y)) + template.rotation.y
+			var basis := Basis(Vector3.UP, yaw).scaled(template.scale)
+			var transform := Transform3D(basis, road.position + template.position) * mesh_instance.transform
+			multimesh.set_instance_transform(index, transform)
+		batch.multimesh = multimesh
+		root.add_child(batch)
+		template.free()
+
+
+static func _first_mesh(node: Node) -> MeshInstance3D:
+	if node is MeshInstance3D:
+		return node
+	for child in node.get_children():
+		var found := _first_mesh(child)
+		if found != null:
+			return found
+	return null
 
 
 static func add_district(root: Node3D, district_name: String) -> Node3D:

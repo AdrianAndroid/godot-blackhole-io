@@ -27,4 +27,17 @@ func run() -> void:
 	expect(is_equal_approx(hole.feedback_pulse, 1.0), "认领和结算可触发洞口脉冲")
 	hole.step(0.1)
 	expect(hole.feedback_pulse < 1.0 and hole.animation_time > 2.1, "视觉脉冲和动画固定步进推进")
+	var revision := hole.size_revision
+	hole.effective_radius = hole.effective_radius
+	expect(hole.size_revision == revision, "同半径奖励不重建黑洞网格")
+	hole.effective_radius = hole.effective_radius + 0.1
+	expect(hole.size_revision == revision + 1, "真实半径变化只重建一次网格")
 	hole.free()
+	var actor := HoleActor.new()
+	actor.build()
+	var actor_revision := actor.radius_revision
+	actor.effective_radius = actor.effective_radius
+	expect(actor.radius_revision == actor_revision, "同半径奖励不更新物理宽阶段")
+	actor.effective_radius += 0.1
+	expect(actor.radius_revision == actor_revision + 1, "成长只更新一次物理半径")
+	actor.free()

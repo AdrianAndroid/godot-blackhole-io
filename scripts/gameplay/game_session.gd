@@ -125,7 +125,7 @@ func _step_gameplay(delta: float) -> void:
 		return
 	remaining_time = maxf(0.0, remaining_time - delta)
 	objective.match_time += delta
-	var direction := drive_input if driver_enabled else input_controller.input_vector
+	var direction := _current_direction()
 	for object in spawn_manager.dynamic_objects:
 		if is_instance_valid(object):
 			object.advance_route(delta, false)
@@ -151,13 +151,22 @@ func _step_presentation(delta: float) -> void:
 			attraction_pool.append(effect)
 			attraction_bursts.remove_at(index)
 	hud.step(delta)
-	spawn_manager.advance_visuals(delta, player.position, player.effective_radius)
 	camera_rig.step(delta, player.position, player.effective_radius)
 	var camera := camera_rig.orthographic_camera if camera_rig.projection == "orthographic" else camera_rig.perspective_camera
+	spawn_manager.advance_visuals(delta, player.position, player.effective_radius, camera)
 	for object in spawn_manager.dynamic_objects:
 		if is_instance_valid(object):
 			object.advance_animation_frame(delta, camera)
+	var water_distance := maxf(0.0, absf(player.position.x - CityGenerator.WATER_CENTER.x) - CityGenerator.WATER_SIZE.x * 0.5)
+	var water_proximity := 1.0 - clampf(water_distance / 12.0, 0.0, 1.0)
+	audio.update_environment(_current_direction().length(), player.effective_radius, water_proximity)
 	_update_hud()
+
+
+func _current_direction() -> Vector2:
+	if driver_enabled:
+		return drive_input
+	return camera_rig.screen_to_ground(input_controller.input_vector)
 
 
 func _on_swallow_claimed(object: Swallowable, hole: HoleActor) -> void:
@@ -245,7 +254,8 @@ func _process_completed_events() -> void:
 						hud.show_message("%d 连击！" % objective.multi_knockdown if objective.multi_knockdown >= 2 else "击倒对手 +%d 目标分" % int(event.score))
 						_record("knockdown", event)
 					else:
-						audio.play("devour")
+						var pitch := 0.97 + float(int(event.object_id) % 5) * 0.025
+						audio.play(_normal_audio_cue(event), pitch)
 						_record("object_settled", event)
 					if not levels.is_empty():
 						audio.play("level_up")
@@ -262,6 +272,13 @@ func _process_completed_events() -> void:
 		_finish(true, "tower")
 	elif remaining_time <= 0.0:
 		_finish(false, "timeout")
+
+
+func _normal_audio_cue(event: Dictionary) -> String:
+	if str(event.model_id) == "perimeter_fence":
+		return "devour_fence"
+	var radius := float(generator._catalog_entry(str(event.model_id)).footprint_radius)
+	return "devour_large" if radius >= 1.0 else "devour"
 
 
 func _feedback_screen_position() -> Vector2:
@@ -284,6 +301,7 @@ func pause() -> void:
 	state = State.PAUSED
 	input_controller.clear()
 	input_controller.enabled = false
+	audio.pause_environment()
 	hud.show_message("已暂停 · 按 Esc 继续")
 	_record("paused")
 
@@ -293,6 +311,7 @@ func resume() -> void:
 		return
 	state = State.PLAYING
 	input_controller.enabled = true
+	audio.resume_environment()
 	hud.show_message("继续对局")
 	_record("resumed")
 
@@ -336,6 +355,7 @@ func _finish(victory: bool, reason: String) -> void:
 		"level": growth.level,
 		"remaining": remaining_time
 	}
+	audio.stop_environment()
 	audio.play("victory" if victory else "defeat")
 	hud.show_result(result)
 	_record("match_finished", result)

@@ -15,7 +15,35 @@ func run() -> void:
 	var static_small_count := 0
 	var nearby_static_small := 0
 	var dynamic_models := {"pedestrian": 0, "duck": 0, "vehicles": 0}
+	var perimeter_fences := 0
+	var waterfront_fences := 0
+	var mixed_building_blocks := 0
+	var compact_building_blocks := 0
+	for block_x in CityGenerator.BLOCK_COORDINATES:
+		for block_z in CityGenerator.BLOCK_COORDINATES:
+			var block_models: Dictionary = {}
+			var minimum := Vector2.INF
+			var maximum := -Vector2.INF
+			var count := 0
+			for object in first.objects:
+				if not CityGenerator.BUILDING_MODEL_IDS.has(object.model_id):
+					continue
+				if absf(object.position.x - block_x) > 8.0 or absf(object.position.z - block_z) > 8.0:
+					continue
+				block_models[object.model_id] = true
+				minimum = minimum.min(Vector2(object.position.x, object.position.z))
+				maximum = maximum.max(Vector2(object.position.x, object.position.z))
+				count += 1
+			if count >= 3:
+				mixed_building_blocks += int(block_models.size() >= 2)
+				var span := maximum - minimum
+				compact_building_blocks += int(maxf(span.x, span.y) < 10.0)
 	for object in first.objects:
+		if object.model_id == "perimeter_fence":
+			perimeter_fences += 1
+			waterfront_fences += int(object.position.x > 43.0)
+			if perimeter_fences == 1:
+				expect(float(generator._catalog_entry(object.model_id).footprint_radius) < GrowthManager.RADII[0], "每段边界围栏均可被一级黑洞吞噬")
 		if CityGenerator.BUILDING_MODEL_IDS.has(object.model_id):
 			building_count += 1
 			if object.position.length() <= 20.0:
@@ -33,6 +61,8 @@ func run() -> void:
 	expect(static_small_count >= 280 and nearby_static_small >= 20, "前期静态可吞小物件和出生点保底供给充足")
 	expect(first.map_size == Vector2(112, 112) and first.roads.size() == 295, "112 米地图和道路数量由网格几何推导")
 	expect(dynamic_models.pedestrian >= 80 and dynamic_models.duck >= 12 and dynamic_models.vehicles >= 20, "行人/鸭子/车辆达到扩充后的城市密度门槛")
+	expect(mixed_building_blocks >= 12 and compact_building_blocks >= 20, "建筑按混合楼群紧凑聚集而非整块复制阵列")
+	expect(perimeter_fences >= 400 and waterfront_fences >= 70, "陆地外缘和水岸都有充足可吞围栏")
 	var changed_route := generator.generate(12345)
 	changed_route.objects.back().route[0].x += 1.0
 	expect(generator.layout_signature(changed_route) != signature, "布局签名覆盖动态路线")
@@ -50,6 +80,12 @@ func run() -> void:
 		if float(generator._catalog_entry(object.model_id).footprint_radius) < 0.38 and object.position.length() < 12.0:
 			missing_small.objects.remove_at(index)
 	expect(generator.validate_layout(missing_small).any(func(message: String) -> bool: return "小物体" in message), "缺少小物体的负向夹具被拒绝")
+	var missing_fences := generator.generate(77)
+	for index in range(missing_fences.objects.size() - 1, -1, -1):
+		if missing_fences.objects[index].model_id == "perimeter_fence":
+			missing_fences.objects.remove_at(index)
+	expect(generator.validate_layout(missing_fences).any(func(message: String) -> bool: return "围栏" in message), "缺少边界围栏的负向夹具被拒绝")
+
 	var threatened := generator.generate(77)
 	threatened.routes[3][0] = Vector3.ZERO
 	expect(generator.validate_layout(threatened).any(func(message: String) -> bool: return "威胁" in message), "出生威胁的负向夹具被拒绝")

@@ -3,6 +3,7 @@ extends TestCase
 
 func run() -> void:
 	var spawn := SpawnManager.new()
+	tree.root.add_child(spawn)
 	spawn.build(CityGenerator.new().generate(13579))
 	var target: Swallowable
 	for object in spawn.objects.values():
@@ -34,6 +35,17 @@ func run() -> void:
 	spawn.advance_visuals(0.25, Vector3.ZERO, 0.38)
 	var water_material := spawn.water_surface.material_override as ShaderMaterial
 	expect(is_equal_approx(spawn.wave_time, 0.25) and water_material.get_shader_parameter("wave_time") == 0.25, "水波只由固定逻辑步进驱动")
+	var view_direction := Vector3(7, 0, 11).normalized()
+	var separated_hole := target.position - view_direction * (target.footprint_radius + 2.0)
+	fader.step(0.5, separated_hole, 0.38)
+	expect(is_zero_approx(fader.fade_amount(target)), "视线外且远离黑洞的建筑保持不透明")
+	var camera := Camera3D.new()
+	spawn.add_child(camera)
+	camera.position = target.position + view_direction * 10.0 + Vector3.UP * 10.0
+	fader.step(0.1, separated_hole, 0.38, camera)
+	expect(fader.fade_amount(target) > 0.0, "低斜镜头与黑洞之间的建筑也会淡出")
+	fader.step(0.5, separated_hole, 0.38)
+	expect(is_zero_approx(fader.fade_amount(target)), "移除视线遮挡后建筑恢复")
 	fader.unregister(target)
 	fader.step(0.5, target.position, 0.38)
 	expect(not fader.states.has(target.get_instance_id()), "已吞噬建筑退出遮挡更新集合")

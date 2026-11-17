@@ -41,12 +41,12 @@ func build(layout: CityGenerator.Layout) -> void:
 	occlusion_fader.register(objects.values())
 
 
-func advance_visuals(delta: float, hole_position: Vector3, hole_radius: float) -> void:
+func advance_visuals(delta: float, hole_position: Vector3, hole_radius: float, camera: Camera3D = null) -> void:
 	wave_time += delta
 	if water_surface != null:
 		var material := water_surface.material_override as ShaderMaterial
 		material.set_shader_parameter("wave_time", wave_time)
-	occlusion_fader.step(delta, hole_position, hole_radius)
+	occlusion_fader.step(delta, hole_position, hole_radius, camera)
 	if is_instance_valid(tower_object) and tower_object.state != Swallowable.State.SETTLED:
 		(tower_object.model_root as TowerVisual).step(delta)
 

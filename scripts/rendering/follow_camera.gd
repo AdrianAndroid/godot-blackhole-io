@@ -5,8 +5,8 @@ var perspective_camera: Camera3D
 var orthographic_camera: Camera3D
 var projection: String = "perspective"
 var map_size := Vector2(96, 96)
-var base_offset := Vector3(0, 20, 15)
-var base_orthographic_size: float = 24.0
+var base_offset := Vector3(7, 10, 11)
+var base_orthographic_size: float = 12.0
 var zoom: float = 1.0
 var smoothing: float = 10.0
 var zoom_smoothing: float = 7.0
@@ -21,7 +21,7 @@ var finale_blend: float = 0.0
 func _ready() -> void:
 	perspective_camera = Camera3D.new()
 	perspective_camera.name = "Perspective"
-	perspective_camera.fov = 48.0
+	perspective_camera.fov = 32.0
 	perspective_camera.projection = Camera3D.PROJECTION_PERSPECTIVE
 	perspective_camera.near = 0.1
 	perspective_camera.far = 250.0
@@ -49,7 +49,7 @@ func set_projection(mode: String) -> bool:
 func step(delta: float, target_position: Vector3, radius: float) -> void:
 	var desired := Vector3(target_position.x, 0, target_position.z)
 	finale_blend = move_toward(finale_blend, 1.0 if finale_active else 0.0, delta * 1.25)
-	var target_zoom := (1.0 + maxf(0.0, radius - 0.38) * 0.5) * lerpf(1.0, 1.55, finale_blend)
+	var target_zoom := growth_zoom(radius) * lerpf(1.0, 1.55, finale_blend)
 	if not initialized:
 		position = desired
 		zoom = target_zoom
@@ -66,7 +66,7 @@ func step(delta: float, target_position: Vector3, radius: float) -> void:
 
 func snap(target_position: Vector3, radius: float) -> void:
 	position = Vector3(target_position.x, 0, target_position.z)
-	zoom = (1.0 + maxf(0.0, radius - 0.38) * 0.5) * lerpf(1.0, 1.55, finale_blend)
+	zoom = growth_zoom(radius) * lerpf(1.0, 1.55, finale_blend)
 	initialized = true
 	shake_offset = Vector3.ZERO
 	_clamp_to_map(Vector3(target_position.x, 0, target_position.z))
@@ -85,6 +85,16 @@ func _clamp_to_map(target_position: Vector3) -> void:
 		position.x = clampf(position.x, target_position.x - 0.5 * zoom, target_position.x + 0.5 * zoom)
 	if not is_equal_approx(unclamped.z, position.z) and absf(target_position.z) <= half.y:
 		position.z = clampf(position.z, target_position.z - 0.75 * zoom, target_position.z + 0.75 * zoom)
+
+
+func growth_zoom(radius: float) -> float:
+	# Let early growth occupy more of the frame; preserve the established max-level view.
+	return 1.0 + maxf(0.0, radius - 1.0) * 0.5775
+
+
+func screen_to_ground(screen_input: Vector2) -> Vector2:
+	var camera_yaw := atan2(base_offset.x, base_offset.z)
+	return screen_input.rotated(-camera_yaw)
 
 
 func set_finale(active: bool) -> void:
@@ -106,7 +116,7 @@ func _update_camera_transform() -> void:
 		perspective_camera.look_at(global_position)
 		orthographic_camera.look_at(global_position)
 	else:
-		perspective_camera.rotation = Vector3(-0.846, 0, 0)
+		perspective_camera.rotation = Basis.looking_at(-offset.normalized(), Vector3.UP).get_euler()
 		orthographic_camera.rotation = perspective_camera.rotation
 
 

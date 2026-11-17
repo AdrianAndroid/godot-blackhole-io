@@ -1,7 +1,7 @@
 class_name CityGenerator
 extends RefCounted
 
-const GENERATION_VERSION: int = 4
+const GENERATION_VERSION: int = 5
 const MAP_SIZE := Vector2(112, 112)
 const ROAD_TILE_SIZE: float = 4.0
 const ROAD_COORDINATES: Array[float] = [-48.0, -32.0, -16.0, 0.0, 16.0, 32.0, 48.0]
@@ -79,6 +79,7 @@ func _generate_attempt(seed_value: int, attempt: int) -> Layout:
 		if _can_place(layout, starter, 0.24):
 			_append_object(layout, _placement(next_id, starter_id, starter, rng))
 			next_id += 1
+	next_id = _populate_perimeter(layout, next_id)
 	_populate_dynamic(layout, next_id, rng)
 	layout.ordinary_total_score = 0
 	for object in layout.objects:
@@ -114,27 +115,52 @@ func _road_tile_expected(x: float, z: float) -> bool:
 
 func _populate_block(layout: Layout, center: Vector3, next_id: int, rng: RandomNumberGenerator) -> int:
 	var central := absf(center.x) <= 8.0 and absf(center.z) <= 8.0
-	var model_id := _pick_building(rng, center)
+	var anchor_model := _pick_building(rng, center)
 	if central:
-		model_id = ["commercial_low_a", "commercial_low_b", "commercial_low_c"][rng.randi_range(0, 2)]
-	var radius := float(_catalog_entry(model_id).footprint_radius)
-	var offsets: Array[Vector3] = []
-	if radius >= 2.4:
-		offsets.assign([Vector3(0, 0, -4.1), Vector3(0, 0, 4.1)])
-	elif radius >= 2.0:
-		offsets.assign([Vector3(-3.6, 0, 0), Vector3(3.6, 0, 0)])
-	else:
-		for x in [-5.25, -1.75, 1.75, 5.25]:
-			for z in [-3.8, 3.8]:
-				offsets.append(Vector3(x, 0, z))
-	for offset in offsets:
-		var building_position := center + offset
-		# The river stays open instead of hiding partially submerged buildings.
-		if building_position.x + radius > BUILDING_EAST_LIMIT:
-			continue
-		if _can_place(layout, building_position, radius):
-			_append_object(layout, _placement(next_id, model_id, building_position, rng))
+		anchor_model = ["commercial_low_a", "commercial_low_b", "commercial_low_c"][rng.randi_range(0, 2)]
+	var anchor_radius := float(_catalog_entry(anchor_model).footprint_radius)
+	var angle := float(rng.randi_range(0, 3)) * PI * 0.5
+	var axis := Vector3.RIGHT.rotated(Vector3.UP, angle)
+	var cross := Vector3.FORWARD.rotated(Vector3.UP, angle)
+	if anchor_radius >= 2.0:
+		# Related tall buildings share a frontage, with a low annex and open space nearby.
+		var cluster_center := center + cross * rng.randf_range(-1.2, 1.2)
+		for side in [-1.0, 1.0]:
+			var building_position: Vector3 = cluster_center + axis * side * (anchor_radius + 0.22)
+			var model_id := _pick_related_large(rng, center, anchor_model)
+			var radius := float(_catalog_entry(model_id).footprint_radius)
+			if building_position.x + radius <= BUILDING_EAST_LIMIT and _can_place(layout, building_position, radius):
+				_append_object(layout, _placement(next_id, model_id, building_position, rng))
+				next_id += 1
+		var annex_position := center - cross * 4.8 + axis * rng.randf_range(-1.0, 1.0)
+		var annex_model: String = ["commercial_low_a", "commercial_low_b", "commercial_low_c"][rng.randi_range(0, 2)]
+		var annex_radius := float(_catalog_entry(annex_model).footprint_radius)
+		if annex_position.x + annex_radius <= BUILDING_EAST_LIMIT and _can_place(layout, annex_position, annex_radius):
+			_append_object(layout, _placement(next_id, annex_model, annex_position, rng))
 			next_id += 1
+	else:
+		# Irregular L, courtyard and fan groups leave a useful plaza instead of filling a 4x2 grid.
+		var patterns: Array = [
+			[Vector2(-2.9, -2.9), Vector2(0, -2.9), Vector2(2.9, -2.9), Vector2(-2.9, 0), Vector2(0, 0), Vector2(2.9, 0), Vector2(0, 2.9)],
+			[Vector2(-2.9, -2.6), Vector2(0, -2.9), Vector2(2.9, -2.6), Vector2(-2.9, 0.3), Vector2(-2.7, 3.2), Vector2(0.2, 3.0), Vector2(2.9, 0.3)],
+			[Vector2(-3.0, -2.4), Vector2(-0.2, -3.0), Vector2(2.7, -2.2), Vector2(-2.1, 0.5), Vector2(0.8, 0.2), Vector2(-1.0, 3.0), Vector2(2.2, 2.8)],
+			[Vector2(-3.0, -2.8), Vector2(-0.1, -2.8), Vector2(2.9, 2.8), Vector2(0, 2.8), Vector2(-2.9, 0.1), Vector2(2.9, -0.1), Vector2(0, 0)],
+		]
+		var pattern: Array = patterns[rng.randi_range(0, patterns.size() - 1)]
+		var cluster_shift := Vector3(rng.randf_range(-1.1, 1.1), 0, rng.randf_range(-1.1, 1.1))
+		var building_count := rng.randi_range(5, pattern.size())
+		for index in building_count:
+			var local: Vector2 = pattern[index]
+			var offset := Vector3(local.x, 0, local.y).rotated(Vector3.UP, angle)
+			offset += Vector3(rng.randf_range(-0.22, 0.22), 0, rng.randf_range(-0.22, 0.22))
+			var building_position := center + cluster_shift + offset
+			var model_id := _pick_low_cluster_building(rng, center, central)
+			var radius := float(_catalog_entry(model_id).footprint_radius)
+			if building_position.x + radius > BUILDING_EAST_LIMIT:
+				continue
+			if _can_place(layout, building_position, radius):
+				_append_object(layout, _placement(next_id, model_id, building_position, rng))
+				next_id += 1
 	var prop_count := 14 if central else rng.randi_range(10, 13)
 	var prop_offsets := [
 		Vector3(-6.8, 0, -4.8), Vector3(-6.8, 0, -1.6), Vector3(-6.8, 0, 1.6), Vector3(-6.8, 0, 4.8),
@@ -171,6 +197,29 @@ func _populate_block(layout: Layout, center: Vector3, next_id: int, rng: RandomN
 				continue
 			if _can_place(layout, prop_position, prop_radius):
 				_append_object(layout, _placement(next_id, prop_id, prop_position, rng))
+				next_id += 1
+	return next_id
+
+
+func _populate_perimeter(layout: Layout, next_id: int) -> int:
+	# Short level-one modules make the boundary a playable food trail, not a collision wall.
+	for index in range(-60, 61):
+		var along := float(index) * 0.9
+		var near_water_entrance := false
+		for road_z in ROAD_COORDINATES:
+			near_water_entrance = near_water_entrance or absf(along - road_z) < 1.35
+		var candidates := [
+			{"position": Vector3(along, 0, -54.6), "rotation_y": 0.0},
+			{"position": Vector3(along, 0, 54.6), "rotation_y": 0.0},
+			{"position": Vector3(-54.6, 0, along), "rotation_y": 90.0},
+		]
+		if not near_water_entrance:
+			candidates.append({"position": Vector3(43.65, 0, along), "rotation_y": 90.0})
+		for candidate in candidates:
+			var position: Vector3 = candidate.position
+			var placement := {"id": next_id, "model_id": "perimeter_fence", "position": position, "rotation_y": candidate.rotation_y, "variant": ""}
+			if _can_place(layout, position, 0.36):
+				_append_object(layout, placement)
 				next_id += 1
 	return next_id
 
@@ -266,6 +315,8 @@ func validate_layout(layout: Layout) -> Array[String]:
 	var starter_prop_count := 0
 	var static_small_count := 0
 	var nearby_buildings := 0
+	var perimeter_fences := 0
+	var waterfront_fences := 0
 	var districts: Dictionary = {}
 	var dynamic_counts := {"vehicles": 0, "characters": 0, "duck": 0}
 	for object in layout.objects:
@@ -280,6 +331,10 @@ func validate_layout(layout: Layout) -> Array[String]:
 		if object.has("route") and (object.route.size() != 4 or float(object.get("route_speed", 0.0)) <= 0.0):
 			errors.append("动态物件路线无效")
 		var position: Vector3 = object.position
+		if object.model_id == "perimeter_fence":
+			perimeter_fences += 1
+			if position.x > 43.0:
+				waterfront_fences += 1
 		if absf(position.x) > layout.map_size.x * 0.5 or absf(position.z) > layout.map_size.y * 0.5:
 			errors.append("目标越出地图")
 		if float(entry.footprint_radius) < 0.38 and not object.has("route"):
@@ -298,6 +353,8 @@ func validate_layout(layout: Layout) -> Array[String]:
 		errors.append("缺少出生小物体或全图静态小物件")
 	if nearby_buildings < 8:
 		errors.append("出生点 20 米内建筑不足 8 栋")
+	if perimeter_fences < 400 or waterfront_fences < 70:
+		errors.append("地图外缘或水岸可吞围栏不足")
 	if dynamic_counts.vehicles < 20 or dynamic_counts.characters < 80 or dynamic_counts.duck < 12:
 		errors.append("车辆/行人/鸭子密度不足")
 	for required_district in ["commercial", "suburban", "industrial", "roads"]:
@@ -392,6 +449,33 @@ func _pick_building(rng: RandomNumberGenerator, position: Vector3) -> String:
 		choices = ["industrial_a", "industrial_b", "industrial_c"]
 	else:
 		choices = ["house_a", "house_b", "house_c", "house_d", "commercial_low_a", "commercial_low_b"]
+	return choices[rng.randi_range(0, choices.size() - 1)]
+
+
+func _pick_low_cluster_building(rng: RandomNumberGenerator, position: Vector3, central: bool) -> String:
+	if central:
+		return ["commercial_low_a", "commercial_low_b", "commercial_low_c"][rng.randi_range(0, 2)]
+	var choices: Array[String] = ["commercial_low_a", "commercial_low_b", "commercial_low_c", "commercial_low_a", "commercial_low_b"]
+	if position.z < -8.0:
+		choices.append("commercial_a")
+		choices.append("commercial_c")
+	elif position.x >= 0.0:
+		choices.append("house_a")
+	return choices[rng.randi_range(0, choices.size() - 1)]
+
+
+func _pick_related_large(rng: RandomNumberGenerator, position: Vector3, anchor_model: String) -> String:
+	var choices: Array[String] = []
+	if anchor_model.begins_with("skyscraper"):
+		choices.assign(["skyscraper_a", "skyscraper_b", "skyscraper_c"])
+	elif anchor_model.begins_with("industrial"):
+		choices.assign(["industrial_a", "industrial_b", "industrial_c"])
+	elif anchor_model.begins_with("house"):
+		choices.assign(["house_a", "house_b", "house_c", "house_d"])
+	elif position.z < -8.0:
+		choices.assign(["commercial_a", "commercial_c", "skyscraper_a"])
+	else:
+		choices.assign([anchor_model])
 	return choices[rng.randi_range(0, choices.size() - 1)]
 
 

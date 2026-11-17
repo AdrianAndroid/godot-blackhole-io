@@ -61,6 +61,13 @@ func run() -> void:
 	var rig := FollowCamera.new()
 	rig.map_size = Vector2(20, 30)
 	rig._ready()
+	var downward_angle := rad_to_deg(atan2(rig.base_offset.y, Vector2(rig.base_offset.x, rig.base_offset.z).length()))
+	expect(downward_angle >= 35.0 and downward_angle <= 42.0, "默认镜头降低为参考视频的斜俯视角")
+	expect(rig.base_offset.x > 0.0 and rig.perspective_camera.fov <= 36.0, "斜向近景同时显示街道与建筑立面")
+	var expected_forward := Vector2(-rig.base_offset.x, -rig.base_offset.z).normalized()
+	expect(rig.screen_to_ground(Vector2.UP).dot(expected_forward) > 0.9999, "斜镜头下向上拖动仍朝屏幕上方移动")
+	expect(is_equal_approx(rig.growth_zoom(0.65), 1.0) and is_equal_approx(rig.growth_zoom(1.0), 1.0), "前中期先让黑洞自然占据画面")
+	expect_near(rig.growth_zoom(GrowthManager.RADII.back()), 3.31, 0.0001, "满级保留既定观察范围")
 	rig.step(1.0 / 60.0, Vector3.ZERO, 0.38)
 	var initial := rig.position
 	rig.step(1.0 / 60.0, Vector3(5, 0, 0), 0.38)
@@ -68,7 +75,7 @@ func run() -> void:
 	var perspective_zoom := rig.zoom
 	rig.step(1.0 / 60.0, Vector3(5, 0, 0), 3.0)
 	expect(rig.zoom > perspective_zoom, "成长只扩大观察范围")
-	var target_zoom := 1.0 + (3.0 - 0.38) * 0.5
+	var target_zoom := rig.growth_zoom(3.0)
 	expect(rig.zoom - perspective_zoom < (target_zoom - perspective_zoom) * 0.2, "成长 zoom 单帧有界而非瞬间跳变")
 	for index in 120:
 		rig.step(1.0 / 60.0, Vector3(100, 0, 100), 0.38)

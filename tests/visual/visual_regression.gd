@@ -1,6 +1,6 @@
 extends SceneTree
 
-const CHECKPOINTS: Array[String] = ["home", "initial", "growing", "sinking", "max_level", "multi_knockdown", "tower", "victory", "defeat", "input_edge", "occlusion", "water_hole"]
+const CHECKPOINTS: Array[String] = ["home", "initial", "growing", "sinking", "fence_sink", "max_level", "multi_knockdown", "tower", "victory", "defeat", "input_edge", "occlusion", "water_hole"]
 var update_baselines: bool = false
 var reports: Array[Dictionary] = []
 var failures: Array[String] = []
@@ -99,9 +99,27 @@ func _prepare_checkpoint(checkpoint: String, session: GameSession) -> void:
 			session.camera_rig.snap(session.player.position, session.player.effective_radius)
 			session.step(0.01)
 			session.step(0.18)
+		"fence_sink":
+			var fence_target: Swallowable
+			for object in session.spawn_manager.objects.values():
+				if object.model_id == "perimeter_fence" and object.position.x < -54.0:
+					fence_target = object
+					break
+			if fence_target == null:
+				failures.append("缺少真实边界围栏检查目标")
+				return
+			session.player.position = fence_target.position
+			session.camera_rig.snap(session.player.position, session.player.effective_radius)
+			session.step(0.01)
+			session.step(0.18)
+			if fence_target.state != Swallowable.State.SINKING:
+				failures.append("一级黑洞未能认领并下沉边界围栏")
 		"max_level":
 			session.growth.add_experience(10000)
 			session.player.effective_radius = session.growth.radius
+			session.camera_rig.snap(session.player.position, session.player.effective_radius)
+			if not is_equal_approx(session.camera_rig.zoom, session.camera_rig.growth_zoom(session.player.effective_radius)):
+				failures.append("满级检查点未应用成长后的镜头距离")
 			session.hud.show_message("最大体型 · 继续吞噬得分")
 			session._update_hud()
 		"multi_knockdown":
@@ -149,7 +167,7 @@ func _prepare_checkpoint(checkpoint: String, session: GameSession) -> void:
 						failures.append("不可吞建筑被错误吞噬")
 					break
 			if occluder != null:
-				session.spawn_manager.advance_visuals(0.5, session.player.position, session.player.effective_radius)
+				session.spawn_manager.advance_visuals(0.5, session.player.position, session.player.effective_radius, session.camera_rig.perspective_camera)
 				if session.spawn_manager.occlusion_fader.fade_amount(occluder) < 0.99:
 					failures.append("遮挡建筑未完成半透明过渡")
 		"water_hole":

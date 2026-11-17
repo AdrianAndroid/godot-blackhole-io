@@ -19,7 +19,7 @@ func register(objects: Array) -> void:
 			states[object.get_instance_id()] = {"object": object, "amount": 0.0, "records": records}
 
 
-func step(delta: float, hole_position: Vector3, hole_radius: float) -> void:
+func step(delta: float, hole_position: Vector3, hole_radius: float, camera: Camera3D = null) -> void:
 	for id in states.keys():
 		var state: Dictionary = states[id]
 		var object: Swallowable = state.object
@@ -28,12 +28,30 @@ func step(delta: float, hole_position: Vector3, hole_radius: float) -> void:
 			continue
 		var distance := Vector2(object.position.x - hole_position.x, object.position.z - hole_position.z).length()
 		var blocked := object.state != Swallowable.State.SETTLED and object.footprint_radius >= hole_radius
-		blocked = blocked and distance < object.footprint_radius + hole_radius * 0.4
+		var covers_hole := distance < object.footprint_radius + hole_radius * 0.4
+		blocked = blocked and (covers_hole or _blocks_view(object, hole_position, hole_radius, camera))
 		var next := move_toward(float(state.amount), 1.0 if blocked else 0.0, delta * FADE_SPEED)
 		if is_equal_approx(float(state.amount), next):
 			continue
 		state.amount = next
 		_apply(state)
+
+
+func _blocks_view(object: Swallowable, hole_position: Vector3, hole_radius: float, camera: Camera3D) -> bool:
+	if camera == null:
+		return false
+	var camera_ground := Vector2(camera.global_position.x, camera.global_position.z)
+	var hole_ground := Vector2(hole_position.x, hole_position.z)
+	var view_segment := hole_ground - camera_ground
+	var length_squared := view_segment.length_squared()
+	if length_squared < 0.001:
+		return false
+	var object_ground := Vector2(object.position.x, object.position.z)
+	var along := (object_ground - camera_ground).dot(view_segment) / length_squared
+	if along <= 0.0 or along >= 1.0:
+		return false
+	var nearest := camera_ground + view_segment * along
+	return object_ground.distance_to(nearest) < object.footprint_radius + maxf(0.35, hole_radius * 0.4)
 
 
 func fade_amount(object: Swallowable) -> float:

@@ -20,9 +20,9 @@
 
 - **用途**：首页、HUD、动态数字与结算实际加载的运行字体；替代完整字体进入游戏和 Web 导出，但不替代上方保留的原始来源文件。
 - **生成方式**：使用 fontTools 4.51.0 对 `NotoSansSC-Variable.ttf` 子集化；保留可变 `wght` 轴、原有轮廓、字重变化及必要 OpenType 布局信息。
-- **字符来源**：`scripts/` 下全部 GDScript 文案、`tests/integration/audio_font_test.gd` 的覆盖契约，以及完整可打印 ASCII。当前包含 296 个字符，动态时间、分数、百分比和标点均覆盖。
+- **字符来源**：`scripts/` 下全部 GDScript 文案、`tests/integration/audio_font_test.gd` 的覆盖契约，以及完整可打印 ASCII。当前包含 327 个字符，动态时间、分数、百分比和标点均覆盖。
 - **复现与防缺字**：运行 `python3 -I tools/subset_font.py` 重新生成；`python3 -I tools/subset_font.py --check` 确定性重建并比较当前文件，运行文案变化而子集未更新时完整验收会失败。
-- **体积与完整性**：209,576 字节；SHA-256：`62de04e925cec37d6955d5298f86a79ce37748209932de819891b40e41da51da`。
+- **体积与完整性**：222,268 字节；SHA-256：`6f7d295540f74b7fe8e19795326d8f3e3b55e4a54ee3022f61fe195ce257f9d1`。
 - **原始文件保护**：原始 17,772,300 字节字体及其 SHA-256 保持不变，用于来源审计和重新生成；Web 导出显式排除原始完整字体，避免 `all_resources` 再次打包。
 - **授权**：属于上述 Noto Sans SC 的 SIL OFL 1.1 衍生字体，继续随附完整 `fonts/OFL.txt`，保留原版权及名称信息。
 
@@ -56,10 +56,29 @@
 - **用途**：保留 UI Pack 原始授权说明，覆盖上表来自该包的 6 个音效。
 - **SHA-256**：`69f7eaa5e05913b4d09cf5848f75390b5c3c9a409ef8555777803d9ca0c171fb`。
 
+## 原创环境音与分类吞噬音
+
+以下 5 个音频由项目内 `tools/generate_atmosphere.py` 使用 Python 标准库确定性合成，不包含外部录音或第三方采样。固定随机种子保证波形可复现；PCM 为 22,050 Hz 单声道，再由本机 `ffmpeg` 的 `libvorbis -q:a 4` 编码为 Ogg Vorbis。生成脚本随源码保存，重新生成命令为 `python3 -I tools/generate_atmosphere.py`；正常运行游戏不需要 Python 或 ffmpeg。
+
+| 本地文件 | 时长 | 游戏用途 |
+| --- | ---: | --- |
+| `audio/city_ambience.ogg` | 8 秒循环 | 低音量城市底声 |
+| `audio/hole_move.ogg` | 2 秒循环 | 随移动输入和成长改变音量、音高 |
+| `audio/water_ambience.ogg` | 6 秒循环 | 随临水距离渐入 |
+| `audio/devour_large.ogg` | 0.48 秒 | 大型建筑吞噬 |
+| `audio/devour_fence.ogg` | 0.24 秒 | 分段围栏吞噬 |
+
+环境循环不参与玩法事件计数；静音、暂停、恢复和结算分别控制输出，不改变固定随机流。资源与状态自动测试不替代主观听感评审。
+
 ## 音频文件 SHA-256
 
 | 文件 | SHA-256 |
 | --- | --- |
+| `audio/city_ambience.ogg` | `302e1887efb58516e99a42d69c65b22d52cb404978233a84628b5a8b35e57a41` |
+| `audio/hole_move.ogg` | `4e986b82feef11d4406cc7832d08337ef55c752cf11cd39d7145c13c169b0e52` |
+| `audio/water_ambience.ogg` | `a09315b773a20321d01c49f9f8f029ef96d44fc5fded48a6b5265764608ae0c2` |
+| `audio/devour_large.ogg` | `815f85f2cf6f3439c65fd08e7297ab6358fd7c8afda37300c2e667f4f9937dea` |
+| `audio/devour_fence.ogg` | `cbb1f0e492372ee3c2be5cd8ebe7be32e5b45addd7764ce49623e0dfe028ea21` |
 | `audio/devour.ogg` | `f74c1334c0c1ab9ec69f3dd723611a8eb89a2630df6c3760dee3b09413370c83` |
 | `audio/level_up.ogg` | `1a4c90fed704b4f4b36d58f481117cfac5cdc25279a9af97d4765b71ff21ed48` |
 | `audio/knockdown.ogg` | `154991a6d9ac80ae193ebad3de7eacb642821e9e48d801d054aa9d2b1004e8c6` |

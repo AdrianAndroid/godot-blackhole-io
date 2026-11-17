@@ -19,8 +19,13 @@ ACCEPTANCE = ARTIFACTS / "acceptance"
 
 EXPECTED_HASHES = {
     "assets/game/fonts/NotoSansSC-Variable.ttf": "a3041811a78c361b1de50f953c805e0244951c21c5bd412f7232ef0d899af0da",
-    "assets/game/fonts/NotoSansSC-Game.ttf": "f3b8f967101fed56df47cf8e1d5e90957c8b44eca29e6c78a20d2b9979a0c778",
+    "assets/game/fonts/NotoSansSC-Game.ttf": "6f7d295540f74b7fe8e19795326d8f3e3b55e4a54ee3022f61fe195ce257f9d1",
     "assets/game/fonts/OFL.txt": "1c05c68c34f9708415aada51f17e1b0092d2cea709bf4a94cd38114f9e73d7d9",
+    "assets/game/audio/city_ambience.ogg": "302e1887efb58516e99a42d69c65b22d52cb404978233a84628b5a8b35e57a41",
+    "assets/game/audio/hole_move.ogg": "4e986b82feef11d4406cc7832d08337ef55c752cf11cd39d7145c13c169b0e52",
+    "assets/game/audio/water_ambience.ogg": "a09315b773a20321d01c49f9f8f029ef96d44fc5fded48a6b5265764608ae0c2",
+    "assets/game/audio/devour_large.ogg": "815f85f2cf6f3439c65fd08e7297ab6358fd7c8afda37300c2e667f4f9937dea",
+    "assets/game/audio/devour_fence.ogg": "cbb1f0e492372ee3c2be5cd8ebe7be32e5b45addd7764ce49623e0dfe028ea21",
     "assets/game/audio/devour.ogg": "f74c1334c0c1ab9ec69f3dd723611a8eb89a2630df6c3760dee3b09413370c83",
     "assets/game/audio/level_up.ogg": "1a4c90fed704b4f4b36d58f481117cfac5cdc25279a9af97d4765b71ff21ed48",
     "assets/game/audio/knockdown.ogg": "154991a6d9ac80ae193ebad3de7eacb642821e9e48d801d054aa9d2b1004e8c6",
@@ -38,7 +43,7 @@ EXPECTED_HASHES = {
 }
 
 CHECKPOINTS = [
-    "home", "initial", "growing", "sinking", "max_level", "multi_knockdown",
+    "home", "initial", "growing", "sinking", "fence_sink", "max_level", "multi_knockdown",
     "tower", "victory", "defeat", "input_edge", "occlusion", "water_hole",
 ]
 
@@ -138,6 +143,7 @@ def audit() -> dict:
         "assets/game/models/vehicles/License.txt",
         "assets/game/models/characters/License.txt",
         "assets/game/audio/LICENSE-Kenney-CC0.txt",
+        "assets/game/ASSETS.md",
         "assets/game/fonts/OFL.txt",
     ]
     for relative in licenses:
@@ -146,8 +152,8 @@ def audit() -> dict:
             failures.append(f"授权正文缺失: {relative}")
     catalog = load_json("config/model_catalog.json")
     models = catalog.get("models", [])
-    if len(models) != 40:
-        failures.append(f"模型注册数量不是 40: {len(models)}")
+    if len(models) != 41:
+        failures.append(f"模型注册数量不是 41: {len(models)}")
     for model in models:
         resource = str(model.get("path", "")).removeprefix("res://")
         if resource.startswith("procedural://"):

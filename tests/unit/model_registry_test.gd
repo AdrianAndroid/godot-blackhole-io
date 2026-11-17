@@ -5,7 +5,7 @@ func run() -> void:
 	var registry := ModelRegistry.new()
 	var errors := registry.validate(true)
 	expect(errors.is_empty(), "正式模型注册表错误: " + str(errors))
-	expect(registry.entries.size() == 40, "应注册 40 个正式模型")
+	expect(registry.entries.size() == 41, "应注册 41 个正式模型")
 
 	var missing := ModelRegistry.new("res://config/not_found.json")
 	expect(not missing.validate(false).is_empty(), "缺失目录必须失败")
@@ -51,3 +51,8 @@ func run() -> void:
 	var duck := registry.instantiate("duck")
 	expect(duck is DuckVisual and registry._valid_bounds(registry.measure_bounds(duck, Transform3D.IDENTITY)), "程序化鸭子是有效实时 3D 网格")
 	duck.free()
+	var fence := registry.instantiate("perimeter_fence")
+	var fence_bounds := registry.measure_bounds(fence, Transform3D.IDENTITY)
+	expect(registry._valid_bounds(fence_bounds) and fence_bounds.size.y >= 0.35, "边界围栏是清晰可见的实时三维模型")
+	expect(SwallowManager.qualifies(GrowthManager.RADII[0], float(registry.get_entry("perimeter_fence").footprint_radius)), "短围栏从一级开始满足严格半径吞噬条件")
+	fence.free()

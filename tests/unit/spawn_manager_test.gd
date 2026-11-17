@@ -7,6 +7,13 @@ func run() -> void:
 	var spawn := SpawnManager.new()
 	spawn.build(layout)
 	expect(spawn.objects.size() == layout.objects.size(), "固定地块全部实例化")
+	var crossroads := layout.roads.filter(func(road: Dictionary) -> bool: return road.model_id == "road_crossroad")
+	var crosswalks := spawn.roads_root.get_node_or_null("Crosswalks") as MultiMeshInstance3D
+	expect(crosswalks != null, "参考路口具有共享批处理斑马线")
+	expect(crosswalks.multimesh.instance_count == crossroads.size() * 32, "每个十字路口四入口各八条细纹")
+	expect(crosswalks.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF and crosswalks.multimesh.mesh is BoxMesh, "斑马线使用共享轻量网格且不投射阴影")
+	var stripe_height := CityVisuals._crosswalk_transform(crossroads[0], 0, 0).origin.y
+	expect(stripe_height > 0.08 and stripe_height < 0.09, "斑马线变换贴合实际道路表面")
 	var districts := {}
 	var variants := {}
 	for object in spawn.objects.values():

@@ -14,7 +14,7 @@ var effective_radius: float = 0.38:
 var radius_revision: int = 0
 var move_speed: float = 5.2
 var map_size := Vector2(96, 96)
-var faction_color := Color("3298ff"):
+var faction_color := Color("0757f6"):
 	set(value):
 		faction_color = value
 		if visual != null:

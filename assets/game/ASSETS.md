@@ -32,6 +32,20 @@
 - **用途**：完整保留 Noto Sans SC 的版权声明及 SIL OFL 1.1 授权正文，未作修改。
 - **SHA-256**：`1c05c68c34f9708415aada51f17e1b0092d2cea709bf4a94cd38114f9e73d7d9`。
 
+## 建筑派生色板
+
+`models/commercial/Textures/reference-{blue,orange,pink}.png` 由 `tools/generate_reference_palettes.py` 从本地 Kenney City Kit Commercial 的原始 `colormap.png` 确定性生成，用于接近参考视频的深蓝楼体、橙色屋顶和粉色立面。保留原始模型、UV、色板、透明度和明暗关系，仅重映射颜色；高层与工业建筑固定使用蓝色，其他建筑复用既有布局 variant，不增加随机调用。
+
+- **来源与授权**：Kenney City Kit Commercial，CC0 1.0；原始授权正文保留在 `models/commercial/License.txt`。派生色板继续按 CC0 分发。
+- **复现**：`python3 -I tools/generate_reference_palettes.py`；CI/完整验收使用 `--check` 验证输出未过期。
+- **运行依赖**：游戏只加载生成后的 PNG，不需要 Python 或 Pillow。
+
+| 文件 | SHA-256 |
+| --- | --- |
+| `models/commercial/Textures/reference-blue.png` | `d4eb42e6466ef6f427db2e219cdb9b8d1f5ec272ddb8434f798ef6d68147e063` |
+| `models/commercial/Textures/reference-orange.png` | `9d9b1aed3c3119ffbc0986a920cc7be20fe6f5c8fa45bc45583f0f90f4466b1c` |
+| `models/commercial/Textures/reference-pink.png` | `2c1b5cea670ea71c06cb2819ee19236cfdf7fe12f1c44f2bd2b5fd5f1663a27b` |
+
 ## 基础音效
 
 以下 6 个文件均直接复制自项目已有候选包 `assets/candidates/ui-pack/extracted/Sounds/`，没有重新编码或修改音频内容。候选包为 **Kenney UI Pack (2.0)**，包内标注创建者为 [Kenney](https://www.kenney.nl/)，官方资源页为 <https://kenney.nl/assets/ui-pack>。

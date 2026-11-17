@@ -39,7 +39,7 @@ func run() -> void:
 		expect(mesh.material_override == null, "配色使用逐表面材质而非整网格覆盖")
 		for surface in mesh.mesh.get_surface_count():
 			var material := mesh.get_surface_override_material(surface) as StandardMaterial3D
-			if material != null and material.albedo_texture != null and material.albedo_texture.resource_path.ends_with("variation-a.png"):
+			if material != null and material.albedo_texture != null and material.albedo_texture.resource_path.ends_with("reference-orange.png"):
 				textured_surfaces += 1
 	expect(textured_surfaces > 0, "商业配色纹理实际应用到表面材质")
 	commercial.free()

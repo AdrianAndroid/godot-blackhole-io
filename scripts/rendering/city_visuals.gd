@@ -10,16 +10,16 @@ void vertex() {
 	world_position = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 }
 void fragment() {
-	float broad = sin(world_position.z * 0.72 + world_position.x * 0.31 + wave_time * 0.8);
-	float crossing = sin(world_position.z * 2.6 - world_position.x * 1.15 - wave_time * 1.3);
-	float crest = smoothstep(0.82, 1.0, broad * 0.72 + crossing * 0.28);
-	vec3 deep = vec3(0.015, 0.34, 0.66);
-	vec3 shallow = vec3(0.025, 0.61, 0.82);
-	ALBEDO = mix(deep, shallow, 0.46 + broad * 0.18) + crest * vec3(0.08, 0.20, 0.24);
-	ROUGHNESS = 0.3;
-	METALLIC = 0.16;
-	SPECULAR = 0.65;
-	EMISSION = crest * vec3(0.01, 0.055, 0.075);
+	float broad = sin(world_position.z * 0.55 + sin(world_position.x * 0.28 + wave_time * 0.2) * 1.8 + wave_time * 0.35);
+	float crossing = sin(world_position.z * 2.2 - world_position.x * 0.85 - wave_time * 0.8);
+	float crest = smoothstep(0.9985, 0.9998, broad);
+	vec3 deep = vec3(0.002, 0.03, 0.55);
+	vec3 shallow = vec3(0.005, 0.16, 1.0);
+	ALBEDO = mix(deep, shallow, 0.55 + broad * 0.12) + crest * vec3(0.25, 0.65, 0.80);
+	ROUGHNESS = 0.38;
+	METALLIC = 0.06;
+	SPECULAR = 0.55;
+	EMISSION = vec3(0.0, 0.015, 0.20) + crest * vec3(0.20, 0.45, 0.55);
 }
 """
 
@@ -31,8 +31,8 @@ static func add_lighting(root: Node3D) -> void:
 	environment.background_mode = Environment.BG_COLOR
 	environment.background_color = Color("83c6e8")
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.ambient_light_color = Color("e5edff")
-	environment.ambient_light_energy = 0.30
+	environment.ambient_light_color = Color("fff1fa")
+	environment.ambient_light_energy = 0.45
 	environment.tonemap_mode = Environment.TONE_MAPPER_LINEAR
 	environment_node.environment = environment
 	root.add_child(environment_node)
@@ -41,7 +41,7 @@ static func add_lighting(root: Node3D) -> void:
 	sun.name = "Sun"
 	sun.rotation_degrees = Vector3(-52.0, -32.0, 0.0)
 	sun.light_color = Color.WHITE
-	sun.light_energy = 0.62
+	sun.light_energy = 0.75
 	sun.shadow_enabled = true
 	sun.shadow_bias = 0.08
 	sun.shadow_normal_bias = 1.0
@@ -58,7 +58,7 @@ static func add_ground(root: Node3D, map_size: Vector2) -> MeshInstance3D:
 	ground.mesh = mesh
 	ground.position.y = -0.15
 	var material := StandardMaterial3D.new()
-	material.albedo_color = Color("827f89")
+	material.albedo_color = Color("71636f")
 	material.roughness = 0.96
 	ground.material_override = material
 	root.add_child(ground)
@@ -77,13 +77,13 @@ static func add_ground_details(root: Node3D) -> void:
 			if center.distance_to(Vector2(CityGenerator.TOWER_POSITION.x, CityGenerator.TOWER_POSITION.z)) < 9.0:
 				continue
 			var grass := MeshInstance3D.new()
-			grass.name = "Grass"
+			grass.name = "Sand" if center.x >= 32.0 else "Grass"
 			var mesh := PlaneMesh.new()
 			mesh.size = Vector2(10.5, 10.5)
 			grass.mesh = mesh
 			grass.position = Vector3(center.x, 0.012, center.y)
 			var material := StandardMaterial3D.new()
-			material.albedo_color = Color("3e762f")
+			material.albedo_color = Color("c9ae4e") if center.x >= 32.0 else Color("4f9228")
 			material.roughness = 0.98
 			grass.material_override = material
 			grass_root.add_child(grass)
@@ -123,11 +123,11 @@ static func style_road(model: Node3D) -> void:
 			var source: Material = model.get_active_material(surface)
 			if source is StandardMaterial3D:
 				var material := source.duplicate() as StandardMaterial3D
-				material.albedo_color = Color(1.12, 1.10, 1.16, 1.0)
+				material.albedo_color = Color(1.15, 0.96, 1.12, 1.0)
 				material.roughness = 0.92
 				material.emission_enabled = true
-				material.emission = Color("26242e")
-				material.emission_energy_multiplier = 0.16
+				material.emission = Color("201326")
+				material.emission_energy_multiplier = 0.12
 				model.set_surface_override_material(surface, material)
 	for child in model.get_children():
 		style_road(child)
@@ -163,6 +163,40 @@ static func add_roads(root: Node3D, roads: Array[Dictionary], registry: ModelReg
 		batch.multimesh = multimesh
 		root.add_child(batch)
 		template.free()
+	_add_crosswalks(root, roads)
+
+
+static func _add_crosswalks(root: Node3D, roads: Array[Dictionary]) -> void:
+	var crossroads := roads.filter(func(road: Dictionary) -> bool: return road.model_id == "road_crossroad")
+	if crossroads.is_empty():
+		return
+	var batch := MultiMeshInstance3D.new()
+	batch.name = "Crosswalks"
+	batch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var stripe_mesh := BoxMesh.new()
+	stripe_mesh.size = Vector3(1.1, 0.004, 0.055)
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color("7b7482")
+	material.roughness = 0.96
+	batch.material_override = material
+	var multimesh := MultiMesh.new()
+	multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	multimesh.mesh = stripe_mesh
+	multimesh.instance_count = crossroads.size() * 32
+	var index := 0
+	for road: Dictionary in crossroads:
+		for entrance in 4:
+			for stripe in 8:
+				multimesh.set_instance_transform(index, _crosswalk_transform(road, entrance, stripe))
+				index += 1
+	batch.multimesh = multimesh
+	root.add_child(batch)
+
+
+static func _crosswalk_transform(road: Dictionary, entrance: int, stripe: int) -> Transform3D:
+	var basis := Basis(Vector3.UP, float(entrance) * PI * 0.5)
+	var offset := basis * Vector3(0.0, 0.084, 1.06 + float(stripe) * 0.11)
+	return Transform3D(basis, road.position + offset)
 
 
 static func _first_mesh(node: Node) -> MeshInstance3D:

@@ -1,6 +1,6 @@
 # Blackhole City
 
-Godot 4.7.2 + GDScript 的实时 3D 黑洞吞噬单局原型。包含成组聚集的混合高度楼群、低斜近景镜头、可吞外缘与水岸围栏、分层环境/移动/吞噬音效，以及 19 级成长、4 个路线对手、金币与完成度、最终深蓝终点塔、胜负结算、暂停、同图重试和首页新城市。当前完成 Mac 竖屏原型，抖音适配后置。
+Godot 4.7.2 + GDScript 的实时 3D 黑洞吞噬单局原型。包含成组聚集的混合高度楼群、蓝/橙/粉参考配色、路口斑马线、48° 斜向近景镜头、深蓝厚环黑洞、可吞外缘与水岸围栏、分层环境/移动/吞噬音效，以及 19 级成长、4 个路线对手、金币与完成度、最终深蓝终点塔、胜负结算、暂停、同图重试和首页新城市。当前完成 Mac 竖屏原型，抖音适配后置。
 
 ## 游戏截图
 
@@ -56,7 +56,7 @@ python3 -I tools/acceptance.py
 - `assets/game/`：正式使用且授权可追溯的资源。
 - `assets/candidates/`：原始候选包；解压目录不进入 Git，也不由 Godot 导入。
 - `tests/`：逻辑、整局、故障、性能与图形自动测试。
-- `tools/acceptance.py`：Mac 统一验收入口；`tools/web_smoke.py` 为真实 Chrome Web 冒烟测试；`tools/subset_font.py` 可复现生成并校验运行字体子集；`tools/generate_atmosphere.py` 可复现生成项目原创环境音与分类吞噬音。
+- `tools/acceptance.py`：Mac 统一验收入口；`tools/web_smoke.py` 为真实 Chrome Web 冒烟测试；`tools/subset_font.py` 可复现生成并校验运行字体子集；`tools/generate_atmosphere.py` 可复现生成项目原创环境音与分类吞噬音；`tools/generate_reference_palettes.py` 可复现生成建筑派生色板。
 - `export_presets.cfg`：无多线程 Web 导出预设。
 - `web/index.html`：Pages 介绍页；实际 Godot 页面为 `play.html`。
 - `.github/workflows/pages.yml`：Web 构建及独立 `gh-pages` 分支自动发布。

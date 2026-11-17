@@ -6,7 +6,7 @@ const DURATION: float = 0.32
 var target: HoleActor
 var age: float = 0.0
 var start_position := Vector3.ZERO
-var trail_color := Color("3298ff")
+var trail_color := Color("0757f6")
 var mesh_instance: MeshInstance3D
 var material: StandardMaterial3D
 var immediate_mesh: ImmediateMesh
@@ -66,7 +66,7 @@ func release() -> void:
 func _rebuild_trails() -> void:
 	if mesh_instance == null or not is_instance_valid(target):
 		return
-	var end := target.global_position + Vector3(0, 0.10, 0)
+	var end := target.global_position + Vector3(0, 0.18, 0)
 	immediate_mesh.clear_surfaces()
 	mesh_revision += 1
 	for lane in 3:
@@ -74,6 +74,6 @@ func _rebuild_trails() -> void:
 		for index in 13:
 			var t := float(index) / 12.0
 			var point := start_position.lerp(end, t)
-			point.y += sin(t * PI) * (0.20 + lane * 0.055)
+			point.y += 0.025 + sin(t * PI) * (0.16 + lane * 0.055)
 			immediate_mesh.surface_add_vertex(point)
 		immediate_mesh.surface_end()

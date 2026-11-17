@@ -62,7 +62,7 @@ func run() -> void:
 	rig.map_size = Vector2(20, 30)
 	rig._ready()
 	var downward_angle := rad_to_deg(atan2(rig.base_offset.y, Vector2(rig.base_offset.x, rig.base_offset.z).length()))
-	expect(downward_angle >= 35.0 and downward_angle <= 42.0, "默认镜头降低为参考视频的斜俯视角")
+	expect(downward_angle >= 47.0 and downward_angle <= 49.0, "默认镜头匹配参考洞口椭圆与斜俯视角")
 	expect(rig.base_offset.x > 0.0 and rig.perspective_camera.fov <= 36.0, "斜向近景同时显示街道与建筑立面")
 	var expected_forward := Vector2(-rig.base_offset.x, -rig.base_offset.z).normalized()
 	expect(rig.screen_to_ground(Vector2.UP).dot(expected_forward) > 0.9999, "斜镜头下向上拖动仍朝屏幕上方移动")

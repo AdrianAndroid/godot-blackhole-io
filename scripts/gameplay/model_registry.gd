@@ -41,8 +41,11 @@ func instantiate(model_id: String, variant: String = "") -> Node3D:
 	instance.position.y = float(entry.ground_offset)
 	instance.rotation_degrees.y = float(entry.get("rotation_y", 0.0))
 	instance.set_meta("model_id", model_id)
-	if variant != "" and entry.district == "commercial":
-		_apply_variant(instance, variant)
+	if _is_building(model_id):
+		var palette: String = "reference-blue" if model_id.begins_with("skyscraper") or model_id.begins_with("industrial") else {
+			"": "reference-blue", "a": "reference-orange", "b": "reference-pink",
+		}.get(variant, "reference-blue")
+		_apply_variant(instance, palette)
 	if model_id == "pedestrian":
 		_configure_pedestrian(instance, variant)
 	return instance
@@ -113,18 +116,24 @@ func _valid_bounds(bounds: AABB) -> bool:
 	return bounds.size.is_finite() and bounds.position.is_finite() and bounds.size.x > 0.0 and bounds.size.y > 0.0 and bounds.size.z > 0.0
 
 
-func _apply_variant(node: Node, variant: String) -> void:
+func _is_building(model_id: String) -> bool:
+	return model_id.begins_with("commercial_") or model_id.begins_with("skyscraper") or model_id.begins_with("house_") or model_id.begins_with("industrial_")
+
+
+func _apply_variant(node: Node, palette: String) -> void:
 	if node is MeshInstance3D and node.mesh != null:
-		var texture_path := "res://assets/game/models/commercial/Textures/variation-%s.png" % variant
+		var texture_path := "res://assets/game/models/commercial/Textures/%s.png" % palette
 		if ResourceLoader.exists(texture_path):
 			for surface in node.mesh.get_surface_count():
 				var material: Material = node.get_active_material(surface)
 				if material is StandardMaterial3D:
 					var copy := material.duplicate() as StandardMaterial3D
+					copy.albedo_color = Color.WHITE
 					copy.albedo_texture = load(texture_path)
+					copy.roughness = 0.86
 					node.set_surface_override_material(surface, copy)
 	for child in node.get_children():
-		_apply_variant(child, variant)
+		_apply_variant(child, palette)
 
 
 func _configure_pedestrian(instance: Node3D, variant: String) -> void:

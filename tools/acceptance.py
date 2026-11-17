@@ -21,6 +21,9 @@ EXPECTED_HASHES = {
     "assets/game/fonts/NotoSansSC-Variable.ttf": "a3041811a78c361b1de50f953c805e0244951c21c5bd412f7232ef0d899af0da",
     "assets/game/fonts/NotoSansSC-Game.ttf": "6f7d295540f74b7fe8e19795326d8f3e3b55e4a54ee3022f61fe195ce257f9d1",
     "assets/game/fonts/OFL.txt": "1c05c68c34f9708415aada51f17e1b0092d2cea709bf4a94cd38114f9e73d7d9",
+    "assets/game/models/commercial/Textures/reference-blue.png": "d4eb42e6466ef6f427db2e219cdb9b8d1f5ec272ddb8434f798ef6d68147e063",
+    "assets/game/models/commercial/Textures/reference-orange.png": "9d9b1aed3c3119ffbc0986a920cc7be20fe6f5c8fa45bc45583f0f90f4466b1c",
+    "assets/game/models/commercial/Textures/reference-pink.png": "2c1b5cea670ea71c06cb2819ee19236cfdf7fe12f1c44f2bd2b5fd5f1663a27b",
     "assets/game/audio/city_ambience.ogg": "a94d01a557e7bd1cc27ecc4c133f50873d6590cd8b5916b61dba9edc5dba0b50",
     "assets/game/audio/hole_move.ogg": "aa085983a63d143e006dbb1f030b53a3bec2aaaa7ba27a4dd7c3d67364425e45",
     "assets/game/audio/water_ambience.ogg": "98e3553898a35442a66a8cc24d6473a2929081bd8e2bcc56bf703cfb0c6a7d53",
@@ -135,6 +138,16 @@ def audit() -> dict:
     )
     if subset_check.returncode != 0:
         failures.append("字体子集未更新或缺少字符: " + subset_check.stdout.strip())
+    palette_check = subprocess.run(
+        [sys.executable, "-I", str(ROOT / "tools/generate_reference_palettes.py"), "--check"],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        timeout=60,
+    )
+    if palette_check.returncode != 0:
+        failures.append("建筑派生色板未更新: " + palette_check.stdout.strip())
     licenses = [
         "assets/game/models/commercial/License.txt",
         "assets/game/models/suburban/License.txt",

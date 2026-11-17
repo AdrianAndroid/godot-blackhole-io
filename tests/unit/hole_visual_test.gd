@@ -12,10 +12,12 @@ func run() -> void:
 	expect_near(hole.visual_diameter(), hole.effective_radius * 2.0, 0.0001, "单一有效半径来源")
 	expect(hole.hole_material.get_shader_parameter("faction_color") == hole.faction_color, "阵营色同步")
 	expect(hole.glow_material.get_shader_parameter("faction_color") == hole.faction_color and hole.rim_material.emission == hole.faction_color, "光晕和厚环共享阵营色")
-	expect(hole.disk.position.y > 0.0 and hole.disk.position.y < 0.1, "黑洞贴地")
+	expect(hole.disk.position.y > 0.09 and hole.disk.position.y < 0.12, "黑洞贴近道路且不被 y=0.08 路砖穿入")
 	expect(hole.glow.position.y < hole.disk.position.y and hole.rim.position.y > hole.disk.position.y, "光晕深井厚环层次清晰")
 	expect_near((hole.glow.mesh as PlaneMesh).size.x, 4.8 * 1.55, 0.0001, "地面光晕超出洞口但不改变逻辑半径")
 	expect_near((hole.rim.mesh as TorusMesh).outer_radius, 2.4 * 0.985, 0.0001, "立体厚环随有效半径成长")
+	expect_near((hole.edge.mesh as TorusMesh).outer_radius, 2.4 * 1.005, 0.0001, "独立蓝色外缘随有效半径成长")
+	expect(hole.rim_material.emission == hole.faction_color and hole.edge_material.albedo_color == Color("0647ed"), "深蓝主环与较亮蓝色外缘分层")
 	expect(hole.edge_particles.size() == HoleVisual.PARTICLE_COUNT, "洞口边缘具有真实三维光点")
 	hole.animation_time = 2.0
 	var frozen_particle := hole.edge_particles[0].position

@@ -21,7 +21,7 @@
 python3 -I tools/acceptance.py
 ```
 
-入口依次运行编辑器导入、全部逻辑（含 100 个固定种子）、预期失败自检、20 局混合结局 soak、13 检查点双投影真实截图、城市投影/分区、真实故障截图及独立重放、性能采样和素材审计。任一必需组失败均返回非零。
+入口依次运行编辑器导入、全部逻辑（含 100 个固定种子）、预期失败自检、20 局混合结局 soak、13 检查点双投影真实截图、城市投影/分区、真实故障截图及独立重放、性能采样、当前源码 Web 导出及真实 Chrome 断点续传/缓存复用测试和素材审计。任一必需组失败均返回非零。
 
 汇总：
 
@@ -170,6 +170,21 @@ python3 -I tools/subset_font.py --check
 
 `tools/web_smoke.py` 的 `startup_seconds` 记录外部导航到 Godot `#status` 消失，`engine_ready_ms` 记录游戏页面自身的 `performance.now()`；`resources` 保存 Resource Timing 的传输量、解码体积、耗时与发起类型。`elapsed_seconds` 还包含固定等待、点击和移动，不能当作纯启动时间。公网优化前后使用同一脚本和新的浏览器上下文测量，报告分别保存在 `artifacts/web/startup-before/` 与最终复验目录。
 
+### 可恢复加载与版本缓存
+
+Godot 默认加载器会把单个文件自动重试四次，并在每次请求时把该文件的下载计数归零；WASM 流式编译失败还会退回 ArrayBuffer 再读取。发布工作流因此在导出后运行 `tools/patch_web_loader.py`，只修改生成的 `play.html` 和介绍页中的版本参数，不改 Godot 引擎或玩法：
+
+- JavaScript、WASM、PCK 发布为带完整提交 SHA 的独立文件名，介绍页 iframe 也带版本参数。Pages 保留最近 24 小时的版本化资源，防止旧缓存 HTML 指向已经替换的固定文件名；固定文件仍保留当前版本，兼容修复前的缓存页面。
+- 启动引擎前下载完整 PCK/WASM，校验发布清单中的字节数和构建时计算的 SHA-256，阻止新旧资源混用。
+- 网络流中断后使用 HTTP Range 从已接收字节继续，进度不归零；连续失败会显示原因和手动重试按钮，不自动整页刷新。
+- 完整资源写入按版本隔离的 Cache Storage；同一版本刷新或再次打开时直接复用，引擎初始化不再访问网络。旧版本缓存只在成功启动后清理。
+- 下载和 WebGL 初始化分别显示状态。缓存不可用或写满时，当前会话仍使用内存中的完整资源启动。
+- 下载失败的手动重试保留内存中的完整资源。Godot 的初始化 Promise 跨 Engine 实例共享，因此引擎启动失败后，按钮会明确提示并在用户点击时手动刷新页面以重置引擎闭包；不会自动刷新，完整缓存资源也不会重新下载。
+
+`tools/web_loader_test.py` 使用真实 Chrome 和可中断的本地 HTTP 服务，故意在版本化 WASM 的 2 MiB 处断开，要求下一请求从准确字节恢复、每次页面加载内的进度分别单调、引擎成功启动，并在同浏览器刷新时确认 WASM/PCK 没有新增网络请求。另一个故障用例在引擎实际初始化完成后注入一次 startGame 拒绝，要求点击“重新初始化”发生一次手动导航、复用缓存并成功恢复。故障用例只豁免各自精确预期的断网或注入错误日志；其它 console error 仍判失败。正常 `web_smoke.py` 路径不接受 console error。
+
+`tools/verify_web_loader.py` 串联当前源码导出、发布 patch、静态标记检查和上述故障测试；完整验收的 `web_loader` 组调用该入口，报告保存为 `artifacts/web/acceptance-loader/report.json`。
+
 ### 本地导出与浏览器验证
 
 ```bash
@@ -178,6 +193,7 @@ python3 -I tools/subset_font.py --check
 mkdir -p build/web
 /usr/local/bin/godot --headless --path . --export-release "Web / GitHub Pages" build/web/play.html
 cp web/index.html build/web/index.html
+python3 -I tools/patch_web_loader.py --input build/web/play.html --index build/web/index.html --version local
 touch build/web/.nojekyll
 python3 -I -m http.server 8765 --bind 127.0.0.1 --directory build/web
 ```
@@ -195,7 +211,7 @@ python3 -I tools/web_smoke.py --url http://127.0.0.1:8765/play.html --output art
 
 ### 自动部署
 
-`.github/workflows/pages.yml` 在 `main` 推送或手动触发时运行：下载指定版本的官方 Godot Linux 引擎与导出模板、导入资源、导出 Web、复制介绍页，再把纯运行文件提交到独立的 `gh-pages` 分支。仓库 Pages 使用 **`gh-pages` / 根目录** 作为发布源；`main` 始终保持源码与 Mac 开发结构，Web 构建产物不会进入 `main`。分支更新后由 GitHub Pages 完成公开站点构建。
+`.github/workflows/pages.yml` 在 `main` 推送或手动触发时运行：下载指定版本的官方 Godot Linux 引擎与导出模板、导入资源、导出 Web、复制介绍页、加入可恢复的版本化加载器并校验 patch 标记和文件，再把纯运行文件提交到独立的 `gh-pages` 分支。发布时按 Git 提交时间保留最近 24 小时的 SHA 版本化资源，旧文件随后自动从站点工作树清理。仓库 Pages 使用 **`gh-pages` / 根目录** 作为发布源；`main` 始终保持源码与 Mac 开发结构，Web 构建产物不会进入 `main`。分支更新后由 GitHub Pages 完成公开站点构建。
 
 公开地址：
 

@@ -124,8 +124,8 @@ def main():
             page.wait_for_timeout(500)
 
             essential_suffixes = (".wasm", ".pck", ".js", ".png", ".html", "/")
-            bad_responses = [item for item in report["responses"] if item["status"] >= 400 and item["url"].endswith(essential_suffixes)]
-            loaded = {suffix: any(item["status"] == 200 and item["url"].endswith(suffix) for item in report["responses"]) for suffix in (".wasm", ".pck", ".js")}
+            bad_responses = [item for item in report["responses"] if item["status"] >= 400 and urlparse(item["url"]).path.endswith(essential_suffixes)]
+            loaded = {suffix: any(item["status"] == 200 and urlparse(item["url"]).path.endswith(suffix) for item in report["responses"]) for suffix in (".wasm", ".pck", ".js")}
             report["checks"]["essential_resources_loaded"] = loaded
             report["checks"]["http_errors"] = bad_responses
             report["checks"]["no_page_errors"] = not report["page_errors"]

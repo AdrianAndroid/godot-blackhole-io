@@ -84,6 +84,7 @@ def command_for(group: str) -> tuple[list[str], int]:
         "fault_visual": (base + ["--script", "res://tests/test_runner.gd", "--", "--group=integration", "--filter=fault_replay", "--report=fault_visual.json"], 0),
         "replay_cli": (base + ["--headless", "--script", "res://tests/gameplay/replay_failure.gd", "--", "--report=artifacts/failures/self_test_tick_limit.json"], 0),
         "performance": (base + ["--script", "res://tests/performance/performance_sample.gd"], 0),
+        "web_loader": ([sys.executable, "-I", str(ROOT / "tools/verify_web_loader.py")], 0),
         "forced_failure": (base + ["--headless", "--script", "res://tests/test_runner.gd", "--", "--group=invalid", "--report=acceptance_expected_failure.json"], 0),
     }
     return commands[group]
@@ -194,6 +195,7 @@ def audit() -> dict:
         "artifacts/fault_visual.json": True,
         "artifacts/failures/self_test_tick_limit_replay.json": True,
         "artifacts/performance/report.json": True,
+        "artifacts/web/acceptance-loader/report.json": True,
     }
     for relative, expected in required_reports.items():
         report = load_json(relative)
@@ -267,7 +269,7 @@ def main() -> int:
         print(f"Godot not found: {GODOT}", file=sys.stderr)
         return 2
     ACCEPTANCE.mkdir(parents=True, exist_ok=True)
-    names = ["editor", "logic", "self_test_failure", "soak", "visual_regression", "city_projection", "city_sample", "fault_visual", "replay_cli", "performance"]
+    names = ["editor", "logic", "self_test_failure", "soak", "visual_regression", "city_projection", "city_sample", "fault_visual", "replay_cli", "performance", "web_loader"]
     if args.verify_failure_exit:
         names = ["forced_failure"]
     elif args.groups:

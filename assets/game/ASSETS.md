@@ -58,7 +58,7 @@
 
 ## 原创环境音与分类吞噬音
 
-以下 5 个音频由项目内 `tools/generate_atmosphere.py` 使用 Python 标准库确定性合成，不包含外部录音或第三方采样。固定随机种子保证波形可复现；PCM 为 22,050 Hz 单声道，再由本机 `ffmpeg` 的 `libvorbis -q:a 4` 编码为 Ogg Vorbis。生成脚本随源码保存，重新生成命令为 `python3 -I tools/generate_atmosphere.py`；正常运行游戏不需要 Python 或 ffmpeg。
+以下 5 个音频由项目内 `tools/generate_atmosphere.py` 使用 Python 标准库确定性合成，不包含外部录音或第三方采样。固定随机种子保证波形可复现；PCM 为 22,050 Hz 单声道，源波形统一规范化到 0.72 峰值（约 −2.85 dBFS），再由本机 `ffmpeg` 的 `libvorbis -q:a 4` 编码为 Ogg Vorbis。生成脚本随源码保存，重新生成命令为 `python3 -I tools/generate_atmosphere.py`；正常运行游戏不需要 Python 或 ffmpeg。
 
 | 本地文件 | 时长 | 游戏用途 |
 | --- | ---: | --- |
@@ -74,11 +74,11 @@
 
 | 文件 | SHA-256 |
 | --- | --- |
-| `audio/city_ambience.ogg` | `302e1887efb58516e99a42d69c65b22d52cb404978233a84628b5a8b35e57a41` |
-| `audio/hole_move.ogg` | `4e986b82feef11d4406cc7832d08337ef55c752cf11cd39d7145c13c169b0e52` |
-| `audio/water_ambience.ogg` | `a09315b773a20321d01c49f9f8f029ef96d44fc5fded48a6b5265764608ae0c2` |
-| `audio/devour_large.ogg` | `815f85f2cf6f3439c65fd08e7297ab6358fd7c8afda37300c2e667f4f9937dea` |
-| `audio/devour_fence.ogg` | `cbb1f0e492372ee3c2be5cd8ebe7be32e5b45addd7764ce49623e0dfe028ea21` |
+| `audio/city_ambience.ogg` | `a94d01a557e7bd1cc27ecc4c133f50873d6590cd8b5916b61dba9edc5dba0b50` |
+| `audio/hole_move.ogg` | `aa085983a63d143e006dbb1f030b53a3bec2aaaa7ba27a4dd7c3d67364425e45` |
+| `audio/water_ambience.ogg` | `98e3553898a35442a66a8cc24d6473a2929081bd8e2bcc56bf703cfb0c6a7d53` |
+| `audio/devour_large.ogg` | `c5f7c14ed9d76d64fc4522256700901c718e1e92d1f3dc3d197e04f18c86afd3` |
+| `audio/devour_fence.ogg` | `189d517d40ea3c5b834ebcf7f610b6d6690a35ea6b6316bdad3f7b9817ae6d95` |
 | `audio/devour.ogg` | `f74c1334c0c1ab9ec69f3dd723611a8eb89a2630df6c3760dee3b09413370c83` |
 | `audio/level_up.ogg` | `1a4c90fed704b4f4b36d58f481117cfac5cdc25279a9af97d4765b71ff21ed48` |
 | `audio/knockdown.ogg` | `154991a6d9ac80ae193ebad3de7eacb642821e9e48d801d054aa9d2b1004e8c6` |

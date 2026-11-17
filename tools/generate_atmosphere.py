@@ -122,7 +122,8 @@ GENERATORS = {
 def encode(name: str, samples: list[float], temporary: Path, output: Path) -> None:
     wav_path = temporary / f"{name}.wav"
     peak = max(1e-9, max(abs(sample) for sample in samples))
-    gain = min(1.0, 0.72 / peak)
+    # Runtime buses apply their own attenuation; keep every source audible and below clipping.
+    gain = 0.72 / peak
     pcm = b"".join(struct.pack("<h", round(max(-1.0, min(1.0, sample * gain)) * 32767)) for sample in samples)
     with wave.open(str(wav_path), "wb") as handle:
         handle.setnchannels(1)

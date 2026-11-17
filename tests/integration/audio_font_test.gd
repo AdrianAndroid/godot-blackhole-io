@@ -74,3 +74,7 @@ func run() -> void:
 	session.audio.stop_all()
 	await tree.process_frame
 	session.free()
+	# The headless dummy mixer releases playback references on its own thread.
+	OS.delay_msec(50)
+	await tree.process_frame
+	await tree.process_frame

@@ -40,7 +40,7 @@
     {"id":"police","path":"res://assets/game/models/vehicles/police.glb","district":"vehicles","scale":0.65,"ground_offset":0.0,"rotation_y":180.0,"footprint_radius":0.90,"xp":5,"score":9,"coins":1,"tier":6,"swallowable":true},
     {"id":"delivery","path":"res://assets/game/models/vehicles/delivery.glb","district":"vehicles","scale":0.65,"ground_offset":0.0,"rotation_y":180.0,"footprint_radius":0.96,"xp":5,"score":10,"coins":1,"tier":6,"swallowable":true},
     {"id":"ambulance","path":"res://assets/game/models/vehicles/ambulance.glb","district":"vehicles","scale":0.65,"ground_offset":0.0,"rotation_y":180.0,"footprint_radius":0.96,"xp":5,"score":10,"coins":1,"tier":6,"swallowable":true},
-    {"id":"pedestrian","path":"res://assets/game/models/characters/characterMedium.fbx","district":"characters","scale":0.22,"ground_offset":0.0,"rotation_y":0.0,"footprint_radius":0.22,"xp":1,"score":2,"coins":0,"tier":1,"swallowable":true},
+    {"id":"pedestrian","path":"res://assets/game/models/characters/characterMedium.fbx","district":"characters","scale":0.22,"ground_offset":0.0,"rotation_y":180.0,"footprint_radius":0.22,"xp":1,"score":2,"coins":0,"tier":1,"swallowable":true},
     {"id":"duck","path":"procedural://duck","district":"suburban","scale":1.0,"ground_offset":0.0,"rotation_y":0.0,"footprint_radius":0.32,"xp":1,"score":3,"coins":1,"tier":1,"swallowable":true}
   ]
 }

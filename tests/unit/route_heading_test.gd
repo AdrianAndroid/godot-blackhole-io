@@ -3,7 +3,7 @@ extends TestCase
 
 func run() -> void:
 	var registry := ModelRegistry.new()
-	for model_id in ["sedan", "taxi", "police", "delivery", "ambulance", "duck"]:
+	for model_id in ["pedestrian", "sedan", "taxi", "police", "delivery", "ambulance", "duck"]:
 		var model := registry.instantiate(model_id)
 		var entry := registry.get_entry(model_id)
 		if model_id == "duck":

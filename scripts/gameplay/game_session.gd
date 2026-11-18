@@ -34,6 +34,7 @@ var camera_rig: FollowCamera
 var input_controller: InputController
 var hud: HudController
 var audio: AudioManager
+var web_diagnostics := WebDiagnostics.new()
 var attraction_bursts: Array[AttractionBurst] = []
 var attraction_pool: Array[AttractionBurst] = []
 var _completed_events: Array[Dictionary] = []
@@ -41,6 +42,7 @@ var _completed_events: Array[Dictionary] = []
 
 func _ready() -> void:
 	name = "Session"
+	web_diagnostics.configure_viewport(get_viewport())
 	_build()
 
 
@@ -88,7 +90,13 @@ func _build() -> void:
 		effect.prepare()
 		add_child(effect)
 		attraction_pool.append(effect)
+	if web_diagnostics.safe_mode:
+		web_diagnostics.apply_safe_scene(spawn_manager)
+		audio.muted = true
 	begin()
+	if web_diagnostics.safe_mode:
+		hud.show_message("SAFE MODE · 3D 75%")
+	web_diagnostics.publish("session_started", snapshot())
 
 
 func begin() -> void:
@@ -160,6 +168,15 @@ func _step_presentation(delta: float) -> void:
 	var water_distance := maxf(0.0, absf(player.position.x - CityGenerator.WATER_CENTER.x) - CityGenerator.WATER_SIZE.x * 0.5)
 	var water_proximity := 1.0 - clampf(water_distance / 12.0, 0.0, 1.0)
 	audio.update_environment(_current_direction().length(), player.effective_radius, water_proximity)
+	if web_diagnostics.heartbeat_due(delta):
+		var diagnostic_snapshot: Dictionary = snapshot()
+		diagnostic_snapshot["last_swallow"] = web_diagnostics.last_swallow
+		diagnostic_snapshot["safe_mode"] = web_diagnostics.safe_mode
+		diagnostic_snapshot["render_scale"] = get_viewport().scaling_3d_scale
+		diagnostic_snapshot["msaa"] = get_viewport().msaa_3d
+		diagnostic_snapshot["audio_muted"] = audio.muted
+		diagnostic_snapshot["shadows_enabled"] = web_diagnostics.shadows_enabled(spawn_manager)
+		web_diagnostics.publish("gameplay", diagnostic_snapshot)
 	_update_hud()
 
 
@@ -248,6 +265,7 @@ func _process_completed_events() -> void:
 					camera_rig.add_shake(0.10 if event.kind == "opponent" else 0.035)
 					hud.show_devour(event, levels, _feedback_screen_position())
 					if event.kind == "normal":
+						web_diagnostics.note_swallow(int(event.object_id), str(event.model_id))
 						spawn_manager.retire_normal(int(event.object_id))
 					if event.kind == "opponent":
 						audio.play("knockdown")
@@ -359,6 +377,7 @@ func _finish(victory: bool, reason: String) -> void:
 	audio.play("victory" if victory else "defeat")
 	hud.show_result(result)
 	_record("match_finished", result)
+	web_diagnostics.publish("match_finished", result)
 	finished.emit(result)
 
 

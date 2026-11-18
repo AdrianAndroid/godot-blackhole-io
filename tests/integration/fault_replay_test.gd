@@ -10,7 +10,7 @@ func run() -> void:
 	var driver := AutoDriver.new()
 	driver.avoid_all_opponents = true
 	driver.failure_label = "self_test_tick_limit"
-	driver.run(session, 0.1, 3)
+	await driver.run(session, 0.1, 3)
 	var report := driver.failure_report
 	expect(not report.is_empty(), "有界驱动失败自动保存报告")
 	expect(report.get("seed") == 4242 and report.get("generation_version") == CityGenerator.GENERATION_VERSION, "报告包含种子和生成版本")

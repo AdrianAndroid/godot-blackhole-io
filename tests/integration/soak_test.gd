@@ -21,7 +21,7 @@ func run() -> void:
 		driver.avoid_all_opponents = mode != "swallowed"
 		driver.failure_label = "soak_%02d_%s" % [index, mode]
 		var started := Time.get_ticks_usec()
-		driver.run(session)
+		await driver.run(session)
 		var reason: String = session.result.get("reason", "none")
 		var expected_reason := "tower" if mode == "victory" else mode
 		if reason != expected_reason:

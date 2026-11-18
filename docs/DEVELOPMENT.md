@@ -21,7 +21,7 @@
 python3 -I tools/acceptance.py
 ```
 
-入口依次运行编辑器导入、全部逻辑（含 100 个固定种子）、预期失败自检、20 局混合结局 soak、13 检查点双投影真实截图、城市投影/分区、真实故障截图及独立重放、性能采样、当前源码 Web 导出及真实 Chrome 断点续传/缓存复用测试和素材审计。任一必需组失败均返回非零。
+入口依次运行编辑器导入、全部逻辑（含 100 个固定种子）、预期失败自检、20 局混合结局 soak、13 检查点双投影真实截图、城市投影/分区、真实故障截图及独立重放、性能采样、当前源码 Web 导出及真实 Chrome 断点续传/缓存复用/连续中断恢复测试和素材审计。任一必需组失败均返回非零。
 
 汇总：
 
@@ -115,7 +115,7 @@ python3 -I tools/acceptance.py --verify-failure-exit
 /usr/local/bin/godot --headless --path . --script res://tests/gameplay/replay_failure.gd -- --report=artifacts/failures/self_test_tick_limit.json
 ```
 
-重放器从种子重建城市，仅回放输入轨迹，比较布局签名、最终快照和故障类别，结果写入 `artifacts/failures/*_replay.json`。自检使用有界驱动故障夹具，不直接写完成度或结局。
+重放器从种子重建城市，仅回放输入轨迹，比较布局签名、最终快照和故障类别，结果写入 `artifacts/failures/*_replay.json`。自检使用有界驱动故障夹具，不直接写完成度或结局。普通物件结算后的模型使用帧末 `queue_free()`；`spawn_manager_test` 在真实 SceneTree 中以 WeakRef 验证节点排队删除、下一帧销毁且不补生成，避免在 gameplay/physics 回调内立即释放渲染子树。高速 AutoDriver 每 120 个手动 tick 让出一次真实帧以排空退休模型，等待期间 `automatic=false`，不额外推进玩法或随机序列。
 
 ## 性能采样
 
@@ -180,8 +180,9 @@ Godot 默认加载器会把单个文件自动重试四次，并在每次请求�
 - 完整资源写入按版本隔离的 Cache Storage；同一版本刷新或再次打开时直接复用，引擎初始化不再访问网络。旧版本缓存只在成功启动后清理。
 - 下载和 WebGL 初始化分别显示状态。缓存不可用或写满时，当前会话仍使用内存中的完整资源启动。
 - 下载失败的手动重试保留内存中的完整资源。Godot 的初始化 Promise 跨 Engine 实例共享，因此引擎启动失败后，按钮会明确提示并在用户点击时手动刷新页面以重置引擎闭包；不会自动刷新，完整缓存资源也不会重新下载。
+- 当前标签页的 `sessionStorage` 保存少量启动阶段、2 秒玩法快照、即时最后吞噬和浏览器/WebGL 故障记录，不向外部服务发送。吞噬事件在模型退休前同步留证，避免下一次心跳前中断丢失现场。运行或初始化中的异常中断会在下次启动创建 WebGL 上下文前关闭 canvas 抗锯齿，并使用 75% 3D 分辨率、关闭 MSAA/阴影和静音；连续第二次异常中断会停止自动启动，必须由用户点击“重试稳定模式”。正常 `pagehide`/手动刷新不计为异常，但已有运行时异常或 WebGL context loss 会跨恢复导航保留；同源 `BroadcastChannel` 握手可识别仍在运行的原标签页，避免复制标签页误计为中断，探测不到原页面时仍按中断保护处理。稳定模式不改变玩法状态或随机序列。浏览器进程自身崩溃无法由 JavaScript 阻止，本机制只负责留证、降低恢复负载和阻止后续连续初始化。
 
-`tools/web_loader_test.py` 使用真实 Chrome 和可中断的本地 HTTP 服务，故意在版本化 WASM 的 2 MiB 处断开，要求下一请求从准确字节恢复、每次页面加载内的进度分别单调、引擎成功启动，并在同浏览器刷新时确认 WASM/PCK 没有新增网络请求。另一个故障用例在引擎实际初始化完成后注入一次 startGame 拒绝，要求点击“重新初始化”发生一次手动导航、复用缓存并成功恢复。故障用例只豁免各自精确预期的断网或注入错误日志；其它 console error 仍判失败。正常 `web_smoke.py` 路径不接受 console error。
+`tools/web_loader_test.py` 使用真实 Chrome 和可中断的本地 HTTP 服务，故意在版本化 WASM 的 2 MiB 处断开，要求下一请求从准确字节恢复、每次页面加载内的进度分别单调、引擎成功启动，并在同浏览器刷新时确认 WASM/PCK 没有新增网络请求。另一个故障用例在引擎实际初始化完成后注入一次 startGame 拒绝，要求点击“重新初始化”发生一次手动导航、复用缓存并成功恢复。连续中断用例抑制 `pagehide` 的干净退出标记，模拟 WebContent 崩溃留下的状态，验证跨页故障/吞噬记录、稳定模式真实渲染参数、第二次中断阻断、无导航的手动稳定重试，以及正常刷新不误判。额外用例驱动物体真实吞噬并在下一次心跳前立即中断，验证最后吞噬已同步写入；让 `startGame()` 保持 pending 后连续中断，验证初始化阶段同样计入恢复保护；在 context loss 后执行正常手动刷新，验证故障不会被 `pagehide` 清除；捕获 WebGL 创建参数验证稳定模式在引擎初始化前关闭 antialias，并检查实际阴影状态。另有 `window.open` 同源复制标签页控制，验证仍存活的原页面不会导致新页面误计中断。故障用例只豁免各自精确预期的断网或注入错误日志；其它 console error 仍判失败。正常 `web_smoke.py` 路径不接受 console error。
 
 `tools/verify_web_loader.py` 串联当前源码导出、发布 patch、静态标记检查和上述故障测试；完整验收的 `web_loader` 组调用该入口，报告保存为 `artifacts/web/acceptance-loader/report.json`。
 

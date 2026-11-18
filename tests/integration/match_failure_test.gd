@@ -5,7 +5,7 @@ func run() -> void:
 	var swallowed := _session(7311)
 	var pursuit := AutoDriver.new()
 	pursuit.mode = "swallowed"
-	pursuit.run(swallowed)
+	await pursuit.run(swallowed)
 	if swallowed.result.get("reason") != "swallowed":
 		FailureReporter.record(swallowed, pursuit, "expected_swallowed", "match_swallowed_failure", 0.1)
 	expect(swallowed.state == GameSession.State.RESULT and swallowed.result.get("reason") == "swallowed", "大型对手通过真实接触和下沉完成整局失败: " + str(swallowed.snapshot()))
@@ -23,7 +23,7 @@ func run() -> void:
 	var survivor := AutoDriver.new()
 	survivor.mode = "timeout"
 	survivor.avoid_all_opponents = true
-	survivor.run(timeout)
+	await survivor.run(timeout)
 	if timeout.result.get("reason") != "timeout" and not survivor.failure_report.is_empty():
 		survivor.failure_report = FailureReporter.record(timeout, survivor, "expected_timeout", "match_timeout_failure", 0.1)
 	expect(timeout.state == GameSession.State.RESULT and timeout.result.get("reason") == "timeout", "真实移动避让并自然耗尽 600 秒: " + str(timeout.snapshot()))

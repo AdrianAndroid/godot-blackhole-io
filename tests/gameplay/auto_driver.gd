@@ -66,6 +66,10 @@ func run(session: GameSession, delta: float = 0.1, maximum_ticks: int = 6000) ->
 		input_trace.append({"tick": ticks, "input": [session.drive_input.x, session.drive_input.y]})
 		session.step(delta)
 		ticks += 1
+		if ticks % 120 == 0 and session.state == GameSession.State.PLAYING:
+			# Manual drivers do not advance gameplay while awaiting this frame.
+			# Let retired queue_free() models drain instead of accumulating for a whole match.
+			await session.get_tree().process_frame
 	session.drive_input = Vector2.ZERO
 	if session.state == GameSession.State.PLAYING:
 		var label := failure_label if not failure_label.is_empty() else "driver_tick_limit_%d" % session.seed_value

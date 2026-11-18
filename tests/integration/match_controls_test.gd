@@ -86,7 +86,7 @@ func _multi_knockdown_match() -> void:
 	session.step(1.0)
 	expect(session.objective.knockdowns == 2 and session.objective.multi_knockdown == 2, "完整对局中实际触发二重击倒")
 	expect(session.objective.current_score == score_before + 120 + int(ordinary.score) and session.objective.coins == coins_before + int(ordinary.coins), "多重击倒增加既定目标分，合法同帧普通吞噬独立结算: score %d -> %d, ordinary=%d, coins %d -> %d, ordinary_coins=%d" % [score_before, session.objective.current_score, int(ordinary.score), coins_before, session.objective.coins, int(ordinary.coins)])
-	driver.run(session)
+	await driver.run(session)
 	expect(session.state == GameSession.State.RESULT and _finished_count(session) == 1, "多重击倒后的完整对局唯一结束")
 	expect(session.layout.signature == session.generator.generate(8243).signature, "多重击倒不消耗或改变城市随机流")
 	session.free()

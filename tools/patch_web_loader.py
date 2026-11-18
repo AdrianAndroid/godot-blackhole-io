@@ -60,6 +60,189 @@ LOADER_SCRIPT = r"""
 	let engineAttempted = false;
 	let completedBytes = 0;
 	let retryDetail = '';
+	const diagnosticStorageKey = 'blackhole-city-runtime-v1';
+	let previousDiagnostic = null;
+	try {
+		const stored = window.sessionStorage.getItem(diagnosticStorageKey);
+		previousDiagnostic = stored ? JSON.parse(stored) : null;
+	} catch (_) {
+		previousDiagnostic = null;
+	}
+	const previousPhase = previousDiagnostic && typeof previousDiagnostic.phase === 'string'
+		? previousDiagnostic.phase : '';
+	const wasInterrupted = previousDiagnostic && (previousDiagnostic.abnormal === true ||
+		['loading', 'running', 'runtime-error', 'unhandled-rejection', 'context-lost'].includes(previousPhase));
+	const interruptionCount = wasInterrupted
+		? Math.min(9, Math.max(0, Number(previousDiagnostic.interruptionCount) || 0) + 1) : 0;
+	const diagnostic = {
+		version: GAME_VERSION,
+		phase: 'loading',
+		startedAt: new Date().toISOString(),
+		timeOrigin: performance.timeOrigin,
+		interruptionCount: interruptionCount,
+		safeMode: interruptionCount > 0,
+		tabId: window.crypto && typeof window.crypto.randomUUID === 'function'
+			? window.crypto.randomUUID() : String(Date.now()) + '-' + String(Math.random()),
+		duplicateTab: false,
+		abnormal: false,
+		lastEvent: null,
+		lastError: null,
+		lastSwallow: null,
+		gameplay: null,
+	};
+	let recoveryBlocked = interruptionCount >= 2;
+
+	function persistDiagnostic() {
+		try {
+			window.sessionStorage.setItem(diagnosticStorageKey, JSON.stringify(diagnostic));
+		} catch (_) {
+			// Storage can be unavailable in private or embedded browsing contexts.
+		}
+	}
+
+	function errorDetail(error) {
+		return {
+			message: String(error && error.message ? error.message : error).slice(0, 500),
+			source: String(error && error.filename ? error.filename : '').slice(0, 300),
+			line: Number(error && error.lineno ? error.lineno : 0),
+		};
+	}
+
+	function recordBrowserEvent(type, payload) {
+		diagnostic.lastEvent = {
+			type: type,
+			at: new Date().toISOString(),
+			payload: payload || null,
+		};
+		persistDiagnostic();
+	}
+
+	window.BlackholeDiagnostics = {
+		get safeMode() { return diagnostic.safeMode; },
+		publish: function (type, payload) {
+			diagnostic.phase = 'running';
+			if (type === 'gameplay') {
+				diagnostic.gameplay = payload;
+			} else if (type === 'swallow') {
+				diagnostic.lastSwallow = payload;
+				if (diagnostic.gameplay) {
+					diagnostic.gameplay.last_swallow = payload;
+				}
+			}
+			recordBrowserEvent(type, payload);
+		},
+		snapshot: function () {
+			return JSON.stringify({current: diagnostic, previous: previousDiagnostic});
+		},
+	};
+	persistDiagnostic();
+	window.addEventListener('error', function (event) {
+		diagnostic.phase = 'runtime-error';
+		diagnostic.abnormal = true;
+		diagnostic.lastError = errorDetail(event);
+		recordBrowserEvent('error', diagnostic.lastError);
+	});
+	window.addEventListener('unhandledrejection', function (event) {
+		diagnostic.phase = 'unhandled-rejection';
+		diagnostic.abnormal = true;
+		diagnostic.lastError = errorDetail(event.reason);
+		recordBrowserEvent('unhandledrejection', diagnostic.lastError);
+	});
+	const gameCanvas = document.getElementById('canvas');
+	let tabChannel = null;
+
+	function configureSafeContext() {
+		if (!gameCanvas || !diagnostic.safeMode) {
+			return;
+		}
+		const originalGetContext = HTMLCanvasElement.prototype.getContext;
+		HTMLCanvasElement.prototype.getContext = function (type, attributes) {
+			if (this === gameCanvas && type === 'webgl2') {
+				attributes = Object.assign({}, attributes, {antialias: false});
+			}
+			return originalGetContext.call(this, type, attributes);
+		};
+	}
+
+	function probePreviousTab() {
+		return new Promise(function (resolve) {
+			let probe = null;
+			let settled = false;
+			let timer = 0;
+			function finish(duplicated) {
+				if (settled) {
+					return;
+				}
+				settled = true;
+				window.clearTimeout(timer);
+				if (probe) {
+					probe.close();
+				}
+				resolve(duplicated);
+			}
+			try {
+				probe = new BroadcastChannel('blackhole-city-tab-' + previousDiagnostic.tabId);
+				probe.onmessage = function (event) {
+					if (event.data && event.data.type === 'pong') {
+						finish(true);
+					}
+				};
+				timer = window.setTimeout(function () { finish(false); }, 200);
+				probe.postMessage({type: 'ping'});
+			} catch (_) {
+				finish(false);
+			}
+		});
+	}
+
+	async function prepareTabSession() {
+		if ('BroadcastChannel' in window) {
+			try {
+				tabChannel = new BroadcastChannel('blackhole-city-tab-' + diagnostic.tabId);
+				tabChannel.onmessage = function (event) {
+					if (event.data && event.data.type === 'ping') {
+						tabChannel.postMessage({type: 'pong'});
+					}
+				};
+			} catch (_) {
+				tabChannel = null;
+			}
+			const navigationEntry = performance.getEntriesByType('navigation')[0];
+			if (wasInterrupted && navigationEntry && navigationEntry.type === 'navigate' &&
+				previousDiagnostic.tabId && await probePreviousTab()) {
+				diagnostic.interruptionCount = 0;
+				diagnostic.safeMode = false;
+				diagnostic.duplicateTab = true;
+				recoveryBlocked = false;
+				recordBrowserEvent('duplicate-tab');
+			}
+		}
+	}
+
+	if (gameCanvas) {
+		gameCanvas.addEventListener('webglcontextlost', function () {
+			diagnostic.phase = 'context-lost';
+			diagnostic.abnormal = true;
+			diagnostic.lastError = {message: 'WebGL context lost', source: '', line: 0};
+			recordBrowserEvent('webglcontextlost');
+		});
+		gameCanvas.addEventListener('webglcontextrestored', function () {
+			diagnostic.phase = 'running';
+			recordBrowserEvent('webglcontextrestored');
+		});
+	}
+	window.addEventListener('pagehide', function () {
+		if (!diagnostic.abnormal) {
+			diagnostic.phase = 'pagehide';
+		}
+		recordBrowserEvent('pagehide', {faultPreserved: diagnostic.abnormal});
+	});
+	window.addEventListener('pageshow', function (event) {
+		if (event.persisted) {
+			diagnostic.phase = 'running';
+			recordBrowserEvent('pageshow', {persisted: true});
+		}
+	});
 
 	function formatMB(bytes) {
 		return (bytes / 1048576).toFixed(1);
@@ -86,10 +269,34 @@ LOADER_SCRIPT = r"""
 		statusProgress.value = loaded;
 		const percent = Math.floor(loaded * 100 / totalBytes);
 		statusDetail.textContent = '下载游戏资源 ' + percent + '% · ' +
-			formatMB(loaded) + ' / ' + formatMB(totalBytes) + ' MB' + retryDetail;
+			formatMB(loaded) + ' / ' + formatMB(totalBytes) + ' MB' + retryDetail +
+			(diagnostic.safeMode ? ' · 稳定模式' : '');
+	}
+
+	function showRecoveryStop() {
+		statusOverlay.style.visibility = 'visible';
+		statusProgress.style.display = 'none';
+		statusSplash.style.display = 'none';
+		statusNotice.style.display = 'block';
+		statusNotice.textContent = '浏览器连续中断，已暂停自动启动';
+		const previousError = previousDiagnostic && previousDiagnostic.lastError
+			? '；最近记录：' + previousDiagnostic.lastError.message : '';
+		const previousGameplay = previousDiagnostic && previousDiagnostic.gameplay;
+		const progressDetail = previousGameplay
+			? '；上次进度 Lv.' + previousGameplay.level + '，得分 ' + previousGameplay.score : '';
+		statusDetail.textContent = '已保留本标签页的运行与吞噬进度，避免继续反复重载' + progressDetail + previousError +
+			'。点击按钮使用稳定模式重试；页面不会自动刷新。';
+		statusDetail.style.display = 'block';
+		retryButton.textContent = '重试稳定模式';
+		retryButton.hidden = false;
+		diagnostic.phase = 'recovery-blocked';
+		recordBrowserEvent('recovery-blocked', {previousPhase: previousPhase});
 	}
 
 	function showFailure(error) {
+		diagnostic.phase = engineAttempted ? 'engine-failed' : 'load-failed';
+		diagnostic.lastError = errorDetail(error);
+		recordBrowserEvent(diagnostic.phase, diagnostic.lastError);
 		statusOverlay.style.visibility = 'visible';
 		statusProgress.style.display = 'none';
 		statusSplash.style.display = 'none';
@@ -341,10 +548,13 @@ LOADER_SCRIPT = r"""
 				retryDetail = '';
 				updateProgress(0);
 			}
-			statusDetail.textContent = '资源完整，正在初始化 WebGL；此阶段不会重新下载。';
+			statusDetail.textContent = '资源完整，正在初始化 WebGL；此阶段不会重新下载。' +
+				(diagnostic.safeMode ? '稳定模式已降低渲染分辨率并关闭音频。' : '');
 			engineAttempted = true;
 			engine = new Engine(GODOT_CONFIG);
 			await engine.startGame({'onProgress': function () { /* Preloading is already complete. */ }});
+			diagnostic.phase = 'running';
+			recordBrowserEvent('engine-started', {safeMode: diagnostic.safeMode});
 			statusOverlay.remove();
 			void cleanOldCaches();
 		} catch (error) {
@@ -356,6 +566,14 @@ LOADER_SCRIPT = r"""
 	}
 
 	retryButton.addEventListener('click', function () {
+		if (recoveryBlocked) {
+			recoveryBlocked = false;
+			diagnostic.safeMode = true;
+			diagnostic.phase = 'loading';
+			recordBrowserEvent('manual-safe-retry');
+			void boot();
+			return;
+		}
 		if (engineAttempted) {
 			// Godot keeps initialization state outside individual Engine instances.
 			// A user-initiated reload is required to reset it; Cache Storage avoids redownloading.
@@ -364,7 +582,15 @@ LOADER_SCRIPT = r"""
 		}
 		void boot();
 	});
-	void boot();
+	function startAfterTabCheck() {
+		configureSafeContext();
+		if (recoveryBlocked) {
+			showRecoveryStop();
+		} else {
+			void boot();
+		}
+	}
+	void prepareTabSession().then(startAfterTabCheck, startAfterTabCheck);
 }());
 """
 
@@ -405,6 +631,9 @@ def main() -> int:
             "window.caches.open",
             "let engine = null;",
             "engineAttempted = true",
+            "BlackholeDiagnostics",
+            "recovery-blocked",
+            "webglcontextlost",
         ]
         missing = [marker for marker in required if marker not in html]
         if missing:

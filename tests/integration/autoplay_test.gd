@@ -11,7 +11,7 @@ func run() -> void:
 	session.growth.changed.connect(func(level: int, _radius: float) -> void: level_events.append(level))
 	var driver := AutoDriver.new()
 	driver.avoid_all_opponents = true
-	var result := driver.run(session)
+	var result := await driver.run(session)
 	expect(session.state == GameSession.State.RESULT, "自动整局到达唯一结算: " + str(session.snapshot()))
 	expect(result.get("victory") == true, "实际移动吞噬成长并吞高塔获胜: " + str(session.snapshot()))
 	expect(session.growth.level > 1, "自动对局实际成长")

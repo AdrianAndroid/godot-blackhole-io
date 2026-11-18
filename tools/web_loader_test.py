@@ -186,6 +186,417 @@ def exercise_engine_retry(context, url: str, export_dir: Path, output: Path, res
         page.close()
 
 
+def read_diagnostics(page) -> dict:
+    return page.evaluate("""
+        () => {
+            const snapshot = JSON.parse(window.BlackholeDiagnostics.snapshot());
+            return {
+                current: snapshot.current,
+                previous: snapshot.previous,
+                stored: JSON.parse(window.sessionStorage.getItem('blackhole-city-runtime-v1')),
+            };
+        }
+    """)
+
+
+def wait_for_gameplay(page, timeout: float = 20) -> dict:
+    started = time.monotonic()
+    latest: dict = {}
+    while time.monotonic() - started < timeout:
+        latest = read_diagnostics(page)
+        if latest["current"].get("gameplay"):
+            return latest
+        time.sleep(0.1)
+    return latest
+
+
+def exercise_swallow_interruption(context, url: str, result: dict) -> None:
+    page = context.new_page()
+    checks: dict[str, bool] = {}
+    page_errors: list[str] = []
+    result.update({"checks": checks, "page_errors": page_errors})
+    page.on("pageerror", lambda error: page_errors.append(str(error)))
+    page.add_init_script("""
+        window.addEventListener('pagehide', function (event) {
+            event.stopImmediatePropagation();
+        }, true);
+    """)
+    try:
+        page.goto(url, wait_until="domcontentloaded")
+        wait_for_engine(page, [], set())
+        canvas_box = page.locator("#canvas").bounding_box()
+        page.mouse.click(canvas_box["x"] + canvas_box["width"] * 0.5, canvas_box["y"] + canvas_box["height"] * 0.54)
+        origin_x = canvas_box["x"] + canvas_box["width"] * 0.5
+        origin_y = canvas_box["y"] + canvas_box["height"] * 0.70
+        page.mouse.move(origin_x, origin_y)
+        page.mouse.down()
+        directions = [(1, -1), (1, 0), (0, -1), (-1, 0), (0, 1), (-1, -1), (1, 1), (-1, 1)]
+        latest: dict = {}
+        started = time.monotonic()
+        while time.monotonic() - started < 20:
+            elapsed = time.monotonic() - started
+            dx, dy = directions[int(elapsed) % len(directions)]
+            page.mouse.move(origin_x + dx * 72, origin_y + dy * 72)
+            latest = read_diagnostics(page)
+            if (latest["stored"].get("lastEvent") or {}).get("type") == "swallow":
+                break
+            page.wait_for_timeout(50)
+        page.mouse.up()
+        result["at_swallow"] = latest
+        swallow = latest["stored"].get("lastSwallow") or {}
+        checks["real_swallow_persisted_before_next_heartbeat"] = (
+            isinstance(swallow.get("object_id"), int)
+            and bool(swallow.get("model_id"))
+            and latest["stored"]["lastEvent"]["type"] == "swallow"
+        )
+        page.reload(wait_until="domcontentloaded")
+        wait_for_engine(page, [], set())
+        recovered = read_diagnostics(page)
+        result["recovered"] = recovered
+        previous_gameplay = (recovered.get("previous") or {}).get("gameplay")
+        checks["swallow_survives_abrupt_reload"] = (
+            recovered["current"]["interruptionCount"] == 1
+            and recovered["current"]["safeMode"] is True
+            and (recovered.get("previous") or {}).get("lastSwallow") == swallow
+        )
+        checks["swallow_updates_latest_progress_snapshot"] = (
+            previous_gameplay is None or previous_gameplay.get("last_swallow") == swallow
+        )
+        checks["swallow_recovery_has_no_page_errors"] = not page_errors
+    except Exception as error:
+        result["exception"] = f"{type(error).__name__}: {error}"
+        raise
+    finally:
+        page.close()
+
+
+def exercise_startup_interruption(context, url: str, export_dir: Path, output: Path, result: dict) -> None:
+    html = (export_dir / "play.html").read_text(encoding="utf-8")
+    version_match = re.search(r'const GAME_VERSION = "([A-Za-z0-9._-]+)"', html)
+    if not version_match:
+        raise RuntimeError("Patched game version was not found")
+    script_path = export_dir / f"play.{version_match.group(1)}.js"
+    source = script_path.read_text(encoding="utf-8")
+    factory_return = "\t\treturn new Engine(initConfig);"
+    injected_return = r"""		const instance = new Engine(initConfig);
+			const originalStartGame = instance.startGame;
+			instance.startGame = function () {
+				if (!window.sessionStorage.getItem('blackhole-allow-engine-start')) {
+					return new Promise(function () {});
+				}
+				return originalStartGame.apply(this, arguments);
+			};
+			return instance;"""
+    injected = source.replace(factory_return, injected_return, 1)
+    if injected == source:
+        raise RuntimeError("Godot engine factory injection point was not found")
+    page = context.new_page()
+    checks: dict[str, bool] = {}
+    page_errors: list[str] = []
+    result.update({"checks": checks, "page_errors": page_errors})
+    page.on("pageerror", lambda error: page_errors.append(str(error)))
+    page.add_init_script("""
+        window.addEventListener('pagehide', function (event) {
+            event.stopImmediatePropagation();
+        }, true);
+    """)
+
+    def route_engine(route):
+        if Path(urlparse(route.request.url).path).name == script_path.name:
+            route.fulfill(status=200, content_type="application/javascript", body=injected)
+        else:
+            route.continue_()
+
+    def wait_for_pending_start():
+        page.wait_for_function("""
+            () => document.getElementById('status-detail')?.textContent.includes('正在初始化 WebGL')
+        """, timeout=15000)
+
+    try:
+        page.route("**/*.js", route_engine)
+        page.goto(url, wait_until="domcontentloaded")
+        wait_for_pending_start()
+        initial = read_diagnostics(page)
+        result["initial"] = initial
+        checks["pending_engine_start_is_loading"] = initial["stored"]["phase"] == "loading"
+
+        page.reload(wait_until="domcontentloaded")
+        wait_for_pending_start()
+        first = read_diagnostics(page)
+        result["first_recovery"] = first
+        checks["startup_interruption_uses_safe_mode"] = (
+            first["current"]["interruptionCount"] == 1
+            and first["current"]["safeMode"] is True
+            and first["previous"]["phase"] == "loading"
+        )
+
+        page.reload(wait_until="domcontentloaded")
+        retry = page.locator("#status-retry")
+        retry.wait_for(state="visible", timeout=15000)
+        blocked = read_diagnostics(page)
+        result["blocked"] = blocked
+        checks["repeated_startup_interruption_blocks_autostart"] = (
+            blocked["current"]["phase"] == "recovery-blocked"
+            and blocked["current"]["interruptionCount"] == 2
+        )
+        page.screenshot(path=output / "startup-interruption-blocked.png")
+
+        page.evaluate("window.sessionStorage.setItem('blackhole-allow-engine-start', '1')")
+        retry.click()
+        wait_for_engine(page, [], set())
+        recovered = read_diagnostics(page)
+        checks["startup_manual_retry_recovers_in_safe_mode"] = (
+            recovered["current"]["phase"] == "running"
+            and recovered["current"]["safeMode"] is True
+        )
+        checks["startup_recovery_has_no_page_errors"] = not page_errors
+    except Exception as error:
+        result["exception"] = f"{type(error).__name__}: {error}"
+        raise
+    finally:
+        page.close()
+
+
+def exercise_context_loss_reload(context, url: str, result: dict) -> None:
+    page = context.new_page()
+    checks: dict[str, bool] = {}
+    page_errors: list[str] = []
+    result.update({"checks": checks, "page_errors": page_errors})
+    page.on("pageerror", lambda error: page_errors.append(str(error)))
+    page.on("dialog", lambda dialog: dialog.dismiss())
+    try:
+        page.goto(url, wait_until="domcontentloaded")
+        wait_for_engine(page, [], set())
+        page.locator("#canvas").dispatch_event("webglcontextlost", {"cancelable": True})
+        fault = read_diagnostics(page)
+        result["fault"] = fault
+        checks["context_loss_is_recorded_as_abnormal"] = (
+            fault["stored"]["phase"] == "context-lost"
+            and fault["stored"]["abnormal"] is True
+        )
+
+        page.reload(wait_until="domcontentloaded")
+        wait_for_engine(page, [], set())
+        recovered = read_diagnostics(page)
+        result["recovered"] = recovered
+        checks["context_loss_survives_normal_recovery_reload"] = (
+            recovered["current"]["interruptionCount"] == 1
+            and recovered["current"]["safeMode"] is True
+            and recovered["previous"]["phase"] == "context-lost"
+            and recovered["previous"]["lastEvent"]["type"] == "pagehide"
+            and recovered["previous"]["lastEvent"]["payload"]["faultPreserved"] is True
+        )
+        checks["context_loss_recovery_has_no_page_errors"] = not page_errors
+    except Exception as error:
+        result["exception"] = f"{type(error).__name__}: {error}"
+        raise
+    finally:
+        page.close()
+
+
+def exercise_duplicate_tab(context, url: str, result: dict) -> None:
+    original = context.new_page()
+    duplicate = None
+    checks: dict[str, bool] = {}
+    page_errors: list[str] = []
+    console: list[dict] = []
+    result.update({"checks": checks, "page_errors": page_errors, "console": console})
+    original.on("pageerror", lambda error: page_errors.append(str(error)))
+    try:
+        original.goto(url, wait_until="domcontentloaded")
+        wait_for_engine(original, [], set())
+        original_state = read_diagnostics(original)
+        result["original"] = original_state
+        with context.expect_page() as page_info:
+            original.evaluate("() => { window.open(window.location.href, '_blank'); }")
+        duplicate = page_info.value
+        duplicate.on("pageerror", lambda error: page_errors.append(str(error)))
+        duplicate.on("console", lambda message: console.append({"type": message.type, "text": message.text}))
+        duplicate.wait_for_load_state("domcontentloaded")
+        wait_for_engine(duplicate, [], set())
+        duplicated_state = read_diagnostics(duplicate)
+        result["duplicate"] = duplicated_state
+        checks["duplicated_running_tab_is_not_interruption"] = (
+            duplicated_state["previous"] is not None
+            and duplicated_state["current"]["interruptionCount"] == 0
+            and duplicated_state["current"]["safeMode"] is False
+            and duplicated_state["current"]["duplicateTab"] is True
+            and duplicated_state["current"]["tabId"] != original_state["current"]["tabId"]
+        )
+        checks["duplicate_tab_has_no_page_errors"] = not page_errors
+        checks["duplicate_tab_has_no_console_errors"] = not any(item["type"] == "error" for item in console)
+    except Exception as error:
+        result["exception"] = f"{type(error).__name__}: {error}"
+        raise
+    finally:
+        if duplicate is not None and not duplicate.is_closed():
+            duplicate.close()
+        original.close()
+
+
+def exercise_interruption_recovery(context, url: str, output: Path, result: dict) -> None:
+    page = context.new_page()
+    checks: dict[str, bool] = {}
+    console: list[dict] = []
+    page_errors: list[str] = []
+    navigations: list[str] = []
+    result.update({"checks": checks, "console": console, "page_errors": page_errors, "navigations": navigations})
+    page.on("console", lambda message: console.append({"type": message.type, "text": message.text}))
+    page.on("pageerror", lambda error: page_errors.append(str(error)))
+    page.on("framenavigated", lambda frame: navigations.append(frame.url) if frame == page.main_frame else None)
+    # A real WebContent crash cannot run pagehide. Suppress only that clean-exit
+    # marker to emulate the persistent state left by two abrupt interruptions.
+    page.add_init_script("""
+        window.addEventListener('pagehide', function (event) {
+            event.stopImmediatePropagation();
+        }, true);
+        window.__webglContextAttributes = [];
+        const originalGetContext = HTMLCanvasElement.prototype.getContext;
+        HTMLCanvasElement.prototype.getContext = function (type, attributes) {
+            window.__webglContextAttributes.push({type: type, attributes: attributes || {}});
+            return originalGetContext.call(this, type, attributes);
+        };
+    """)
+    try:
+        page.goto(url, wait_until="domcontentloaded")
+        wait_for_engine(page, [], set())
+        page.wait_for_timeout(500)
+        canvas_box = page.locator("#canvas").bounding_box()
+        page.mouse.click(canvas_box["x"] + canvas_box["width"] * 0.5, canvas_box["y"] + canvas_box["height"] * 0.54)
+        page.wait_for_timeout(4000)
+        initial = wait_for_gameplay(page)
+        result["initial"] = initial
+        initial_gameplay = initial["current"].get("gameplay") or {}
+        checks["gameplay_heartbeat_recorded"] = (
+            initial["current"]["phase"] == "running"
+            and isinstance(initial_gameplay.get("objects_remaining"), int)
+            and initial_gameplay.get("shadows_enabled") is True
+            and initial["stored"]["gameplay"] == initial_gameplay
+        )
+        page.evaluate("""
+            () => window.dispatchEvent(new ErrorEvent('error', {
+                message: 'Injected runtime diagnostic marker',
+                filename: 'runtime-diagnostic-test',
+                lineno: 17,
+            }))
+        """)
+        fault = read_diagnostics(page)
+        checks["runtime_fault_persisted"] = (
+            fault["stored"]["phase"] == "runtime-error"
+            and fault["stored"]["abnormal"] is True
+            and fault["stored"]["lastError"]["message"] == "Injected runtime diagnostic marker"
+            and fault["stored"]["lastError"]["line"] == 17
+        )
+
+        page.reload(wait_until="domcontentloaded")
+        wait_for_engine(page, [], set())
+        page.wait_for_timeout(500)
+        canvas_box = page.locator("#canvas").bounding_box()
+        page.mouse.click(canvas_box["x"] + canvas_box["width"] * 0.5, canvas_box["y"] + canvas_box["height"] * 0.54)
+        page.wait_for_timeout(4000)
+        first_recovery = wait_for_gameplay(page)
+        result["first_recovery"] = first_recovery
+        context_requests = page.evaluate("window.__webglContextAttributes")
+        result["first_recovery_contexts"] = context_requests
+        previous_gameplay = (first_recovery.get("previous") or {}).get("gameplay") or {}
+        recovery_gameplay = first_recovery["current"].get("gameplay") or {}
+        checks["first_interruption_uses_safe_mode"] = (
+            first_recovery["current"]["interruptionCount"] == 1
+            and first_recovery["current"]["safeMode"] is True
+            and first_recovery["current"]["phase"] == "running"
+            and recovery_gameplay.get("safe_mode") is True
+            and recovery_gameplay.get("render_scale") == 0.75
+            and recovery_gameplay.get("msaa") == 0
+            and recovery_gameplay.get("audio_muted") is True
+            and recovery_gameplay.get("shadows_enabled") is False
+        )
+        checks["safe_mode_disables_context_antialias_before_engine"] = any(
+            request.get("type") == "webgl2" and (request.get("attributes") or {}).get("antialias") is False
+            for request in context_requests
+        )
+        checks["previous_progress_and_fault_preserved"] = (
+            previous_gameplay.get("objects_remaining") == initial_gameplay.get("objects_remaining")
+            and first_recovery["previous"]["lastError"]["message"] == "Injected runtime diagnostic marker"
+        )
+        page.screenshot(path=output / "interruption-safe-mode.png")
+        page.evaluate("""
+            () => window.dispatchEvent(new PromiseRejectionEvent('unhandledrejection', {
+                promise: Promise.resolve(),
+                reason: new Error('Injected rejection diagnostic marker'),
+            }))
+        """)
+        rejection = read_diagnostics(page)
+        checks["unhandled_rejection_persisted"] = (
+            rejection["stored"]["phase"] == "unhandled-rejection"
+            and rejection["stored"]["abnormal"] is True
+            and rejection["stored"]["lastError"]["message"] == "Injected rejection diagnostic marker"
+        )
+
+        page.reload(wait_until="domcontentloaded")
+        retry = page.locator("#status-retry")
+        retry.wait_for(state="visible", timeout=15000)
+        page.wait_for_timeout(500)
+        blocked = read_diagnostics(page)
+        checks["repeated_interruption_blocks_autostart"] = (
+            blocked["current"]["phase"] == "recovery-blocked"
+            and blocked["current"]["interruptionCount"] == 2
+            and page.locator("#status-notice").text_content() == "浏览器连续中断，已暂停自动启动"
+            and "上次进度 Lv." in (page.locator("#status-detail").text_content() or "")
+            and retry.text_content() == "重试稳定模式"
+        )
+        checks["blocked_page_does_not_auto_reload"] = len(navigations) == 3
+        page.screenshot(path=output / "interruption-blocked.png")
+
+        retry.click()
+        wait_for_engine(page, [], set())
+        recovered = read_diagnostics(page)
+        checks["manual_safe_retry_starts_engine"] = (
+            page.locator("#status").count() == 0
+            and recovered["current"]["phase"] == "running"
+            and recovered["current"]["safeMode"] is True
+        )
+        checks["manual_safe_retry_does_not_navigate"] = len(navigations) == 3
+        page.screenshot(path=output / "interruption-manual-recovery.png")
+        page.close()
+
+        normal = context.new_page()
+        normal_errors: list[str] = []
+        normal_console: list[dict] = []
+        normal.on("pageerror", lambda error: normal_errors.append(str(error)))
+        normal.on("console", lambda message: normal_console.append({"type": message.type, "text": message.text}))
+        normal.goto(url, wait_until="domcontentloaded")
+        wait_for_engine(normal, [], set())
+        normal.reload(wait_until="domcontentloaded")
+        wait_for_engine(normal, [], set())
+        normal_state = read_diagnostics(normal)
+        checks["normal_manual_reload_is_not_interruption"] = (
+            normal_state["current"]["interruptionCount"] == 0
+            and normal_state["current"]["safeMode"] is False
+            and normal_state["previous"]["phase"] == "pagehide"
+        )
+        checks["normal_reload_has_no_page_errors"] = not normal_errors
+        normal.close()
+        unexpected = [item for item in console + normal_console if item["type"] == "error"]
+        result["unexpected_console_errors"] = unexpected
+        checks["recovery_has_no_page_errors"] = not page_errors
+        checks["recovery_has_no_console_errors"] = not unexpected
+    except Exception as error:
+        result["exception"] = f"{type(error).__name__}: {error}"
+        try:
+            result["failure_state"] = {
+                "notice": page.locator("#status-notice").text_content(),
+                "detail": page.locator("#status-detail").text_content(),
+                "diagnostics": read_diagnostics(page),
+            }
+            page.screenshot(path=output / "interruption-failure.png")
+        except Exception as debug_error:
+            result["debug_exception"] = str(debug_error)
+        raise
+    finally:
+        if not page.is_closed():
+            page.close()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--export-dir", type=Path, default=Path("build/web"))
@@ -246,6 +657,21 @@ def main() -> int:
             report["engine_retry"] = {}
             exercise_engine_retry(context, url, args.export_dir.resolve(), args.output, report["engine_retry"])
             report["checks"].update(report["engine_retry"]["checks"])
+            report["interruption_recovery"] = {}
+            exercise_interruption_recovery(context, url, args.output, report["interruption_recovery"])
+            report["checks"].update(report["interruption_recovery"]["checks"])
+            report["swallow_interruption"] = {}
+            exercise_swallow_interruption(context, url, report["swallow_interruption"])
+            report["checks"].update(report["swallow_interruption"]["checks"])
+            report["startup_interruption"] = {}
+            exercise_startup_interruption(context, url, args.export_dir.resolve(), args.output, report["startup_interruption"])
+            report["checks"].update(report["startup_interruption"]["checks"])
+            report["context_loss_recovery"] = {}
+            exercise_context_loss_reload(context, url, report["context_loss_recovery"])
+            report["checks"].update(report["context_loss_recovery"]["checks"])
+            report["duplicate_tab"] = {}
+            exercise_duplicate_tab(context, url, report["duplicate_tab"])
+            report["checks"].update(report["duplicate_tab"]["checks"])
             browser.close()
 
         attempts = list(InterruptingHandler.wasm_attempts)

@@ -5,6 +5,7 @@ func run() -> void:
 	var generator := CityGenerator.new()
 	var layout := generator.generate(2468)
 	var spawn := SpawnManager.new()
+	tree.root.add_child(spawn)
 	spawn.build(layout)
 	expect(spawn.objects.size() == layout.objects.size(), "固定地块全部实例化")
 	var crossroads := layout.roads.filter(func(road: Dictionary) -> bool: return road.model_id == "road_crossroad")
@@ -55,8 +56,14 @@ func run() -> void:
 	expect(swallow.try_claim(target, hole), "城市物体可进入吞噬")
 	swallow.step(1.0)
 	expect(target.state == Swallowable.State.SETTLED and not target.visible, "当局物体永久消失")
+	var retired_model: Node3D = target.model_root
+	var retired_reference: WeakRef = weakref(retired_model)
 	spawn.retire_normal(target.object_id)
 	expect(not spawn.objects.has(target.object_id) and target.model_root == null, "结算后释放渲染资源引用并保留事务状态")
+	expect(retired_model.is_queued_for_deletion(), "吞噬结算只排队删除模型，避免游戏步内立即释放")
+	await tree.process_frame
+	expect(retired_reference.get_ref() == null, "退休模型在帧末真正销毁")
+	expect(target.get_child_count() == 1 and is_instance_valid(target.area), "模型销毁后仅保留禁用碰撞区，不残留渲染子树")
 	for index in 600:
 		swallow.step(1.0)
 	expect(spawn.objects.size() == original_count - 1, "推进对局时间不补生成")

@@ -170,7 +170,7 @@ func release_visual() -> void:
 	_animation_player = null
 	if is_instance_valid(model_root):
 		_clear_surface_overrides(model_root)
-		model_root.free()
+		model_root.queue_free()
 		model_root = null
 	if is_instance_valid(area):
 		area.monitoring = false
